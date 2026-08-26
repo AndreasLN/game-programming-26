@@ -2,14 +2,27 @@
 #include <SDL3/SDL.h>
 #include <iostream>
 
-void move(int horizontal, int vertical, int speed, SDL_Time time_elapsed_frame , SDL_FRect * player_rect)
+void move(int horizontal, int vertical, double speed, SDL_Time time_elapsed_frame , SDL_FRect *player_rect)
 {
-	SDL_Log("horizontal: %i, vertical: %i\n", horizontal, vertical);
-
-	//SDL_Log("speed: %f, time: %f\n", speed, time_elapsed_frame);
-
 	(*player_rect).x += horizontal * speed * time_elapsed_frame;
 	(*player_rect).y += vertical * speed * time_elapsed_frame;
+}
+
+void border_collision(SDL_FRect *player_rect, float window_w, float window_h){
+
+	if((*player_rect).x < 0){
+			(*player_rect).x = 0;
+	}
+	if((*player_rect).x + (*player_rect).w > window_w){
+		(*player_rect).x = window_w - (*player_rect).w;
+	}
+	if((*player_rect).y < 0){
+		(*player_rect).y = 0;
+	}
+	if((*player_rect).y + (*player_rect).h > window_h){
+		(*player_rect).y = window_h - (*player_rect).h;
+	}
+
 }
 
 int main(int argc, char* argv[])
@@ -55,7 +68,7 @@ int main(int argc, char* argv[])
 	player_rect.y = window_h / 2 - player_size / 2;
 	int horizontal = 0;
 	int vertical = 0;
-	float speed = 0.0000005;
+	double speed = 0.0000005;
 
 
 
@@ -227,22 +240,9 @@ int main(int argc, char* argv[])
 		player_rect.w = player_size;
 		window_w;
 
-		move(1, vertical, speed, time_elapsed_frame, &player_rect);;
-		//player_rect.x += horizontal * speed * time_elapsed_frame;
-		//player_rect.y += vertical * speed * time_elapsed_frame;
-		//SDL_Log("%f, %f\n", player_rect.x, player_rect.y);
-		if(player_rect.x < 0){
-			player_rect.x = 0;
-		}
-		if(player_rect.x + player_rect.w > window_w){
-			player_rect.x = window_w - player_rect.w;
-		}
-		if(player_rect.y < 0){
-			player_rect.y = 0;
-		}
-		if(player_rect.y + player_rect.h > window_h){
-			player_rect.y = window_h - player_rect.h;
-		}
+		move(horizontal, vertical, speed, time_elapsed_frame, &player_rect);;
+
+		border_collision(&player_rect, window_w, window_h);
 
 		// render
 		SDL_RenderPresent(renderer);
