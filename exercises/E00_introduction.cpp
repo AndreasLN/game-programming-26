@@ -1,4 +1,12 @@
 #include <SDL3/SDL.h>
+#include <iostream>
+
+void move(int horizontal, int vertical, int speed, SDL_FRect player_rect)
+{
+	//std::cout << horizontal;
+	player_rect.x += horizontal * speed;
+	player_rect.y += vertical * speed;
+}
 
 int main(int argc, char* argv[])
 {
@@ -13,11 +21,13 @@ int main(int argc, char* argv[])
 	// increase the zoom to make debug text more legible
 	// (ie, on the class projector, we will usually use 2)
 	{
-		float zoom = 1;
+		float zoom = 2;
 		window_w /= zoom;
 		window_h /= zoom;
 		SDL_SetRenderScale(renderer, zoom, zoom);
 	}
+
+	
 
 	bool quit = false;
 
@@ -38,6 +48,10 @@ int main(int argc, char* argv[])
 	player_rect.h = player_size;
 	player_rect.x = window_w / 2 - player_size / 2;
 	player_rect.y = window_h / 2 - player_size / 2;
+	int horizontal = 0;
+	int vertical = 0;
+	float speed = 0.0000005;
+
 
 
 	bool btn_pressed_up = false;
@@ -45,6 +59,9 @@ int main(int argc, char* argv[])
 	SDL_GetCurrentTime(&walltime_frame_beg);
 	while(!quit)
 	{
+		//move(horizontal, vertical, speed, player_rect);
+		
+		//std::cout << horizontal;
 		// input
 		SDL_Event event;
 		while(SDL_PollEvent(&event))
@@ -54,13 +71,62 @@ int main(int argc, char* argv[])
 				case SDL_EVENT_QUIT:
 					quit = true;
 					break;
-				case SDL_EVENT_KEY_DOWN:
-					if(event.key.key >= SDLK_1 && event.key.key < SDLK_6)
-						delay_type = event.key.key - SDLK_1;
+				case SDL_EVENT_KEY_UP:
+					switch (event.key.key)
+						{
+						case SDLK_W:
+							//std::cout << "hello";
+							if(vertical < 0)
+								vertical = 0;
+							break;
+						case SDLK_A:
+							//cout << "LEFT";
+							if(horizontal < 0)
+								horizontal = 0;
+							break;
+						case SDLK_S:
+							//cout << "DOWN";
+							if(vertical > 0)
+								vertical = 0;
+							break;
+						case SDLK_D:
+							//cout << "RIGHT";
+							if(horizontal > 0)
+								horizontal = 0;
+							break;
+						}
 					break;
+				case SDL_EVENT_KEY_DOWN:
+					if(event.key.key >= SDLK_1 && event.key.key < SDLK_6){
+						delay_type = event.key.key - SDLK_1;
+						break;
+					}
+					else{
+						switch (event.key.key)
+						{
+							case SDLK_D:
+								//cout << "RIGHT";
+								horizontal = 1;
+								break;
+							case SDLK_A:
+								//cout << "LEFT";
+								horizontal = -1;
+								break;
+							case SDLK_W:
+								vertical = -1;
+								break;
+							case SDLK_S:
+								//cout << "DOWN";
+								vertical = 1;
+								break;
+							
+
+						}
+					}
+					break;
+
 			}
 		}
-
 		// clear screen
 		// NOTE: `0x` prefix means we are expressing the number in hexadecimal (base 16)
 		//       `0b` is another useful prefix, expresses the number in binary
@@ -149,11 +215,15 @@ int main(int argc, char* argv[])
 		SDL_RenderDebugTextFormat(renderer, 10.0f, 50.0f, "time spent sleeping   : %9.6f ms", (float)time_elapsed_sleep/(float)1000000);
 		SDL_RenderDebugTextFormat(renderer, 10.0f, 60.0f, "time spent busywaiting: %9.6f ms", (float)time_elapsed_busywait/(float)1000000);
 
+		player_rect.x += horizontal * speed * time_elapsed_frame;
+		player_rect.y += vertical * speed * time_elapsed_frame;
 
 		// render
 		SDL_RenderPresent(renderer);
 		
-		walltime_frame_beg = walltime_frame_end;
+		//walltime_frame_beg = walltime_frame_end;
+
+		SDL_GetCurrentTime(&walltime_frame_beg);
 	}
 
 	// NOTE: we created a bunch of resources (window, renderer). Should we explicitely destroy them here?
