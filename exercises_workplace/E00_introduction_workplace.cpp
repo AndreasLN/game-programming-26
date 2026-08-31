@@ -2,6 +2,8 @@
 #include <SDL3/SDL.h>
 #include <iostream>
 
+
+
 void move(int horizontal, int vertical, double speed, SDL_Time time_elapsed_frame , SDL_FRect *player_rect)
 {
 	(*player_rect).x += horizontal * speed * time_elapsed_frame;
@@ -70,6 +72,16 @@ int main(int argc, char* argv[])
 	int vertical = 0;
 	double speed = 0.0000005;
 
+	float player_size_2 = 40;
+	SDL_FRect player_rect_2;
+	player_rect_2.w = player_size_2;
+	player_rect_2.h = player_size_2;
+	player_rect_2.x = window_w / 2 - player_size_2 / 2;
+	player_rect_2.y = window_h / 2 - player_size_2 / 2;
+	int horizontal_2 = 0;
+	int vertical_2 = 0;
+	double speed_2 = 0.0000005;
+
 
 
 	bool btn_pressed_up = false;
@@ -112,6 +124,26 @@ int main(int argc, char* argv[])
 							if(horizontal > 0)
 								horizontal = 0;
 							break;
+						case SDLK_UP:
+							//std::cout << "hello";
+							if(vertical_2 < 0)
+								vertical_2 = 0;
+							break;
+						case SDLK_LEFT:
+							//cout << "LEFT";
+							if(horizontal_2 < 0)
+								horizontal_2 = 0;
+							break;
+						case SDLK_DOWN:
+							//cout << "DOWN";
+							if(vertical_2 > 0)
+								vertical_2 = 0;
+							break;
+						case SDLK_RIGHT:
+							//cout << "RIGHT";
+							if(horizontal_2 > 0)
+								horizontal_2 = 0;
+							break;
 						}
 					break;
 				case SDL_EVENT_KEY_DOWN:
@@ -137,8 +169,21 @@ int main(int argc, char* argv[])
 								//cout << "DOWN";
 								vertical = 1;
 								break;
-							
-
+							case SDLK_RIGHT:
+								//cout << "RIGHT";
+								horizontal_2 = 1;
+								break;
+							case SDLK_LEFT:
+								//cout << "LEFT";
+								horizontal_2 = -1;
+								break;
+							case SDLK_UP:
+								vertical_2 = -1;
+								break;
+							case SDLK_DOWN:
+								//cout << "DOWN";
+								vertical_2 = 1;
+								break;
 						}
 					}
 					break;
@@ -153,6 +198,9 @@ int main(int argc, char* argv[])
 		
 		SDL_SetRenderDrawColor(renderer, 0x3C, 0x63, 0xFF, 0XFF);
 		SDL_RenderFillRect(renderer, &player_rect);
+
+		SDL_SetRenderDrawColor(renderer, 0x3C, 0x63, 0xFF, 0XFF);
+		SDL_RenderFillRect(renderer, &player_rect_2);
 
 		SDL_GetCurrentTime(&walltime_work_end);
 		//SDL_Log("%lu, %lu\n", walltime_work_end, walltime_frame_beg);
@@ -234,15 +282,12 @@ int main(int argc, char* argv[])
 		SDL_RenderDebugTextFormat(renderer, 10.0f, 50.0f, "time spent sleeping   : %9.6f ms", (float)time_elapsed_sleep/(float)1000000);
 		SDL_RenderDebugTextFormat(renderer, 10.0f, 60.0f, "time spent busywaiting: %9.6f ms", (float)time_elapsed_busywait/(float)1000000);
 
-		window_h;
-
-		player_rect.h = player_size;
-		player_rect.w = player_size;
-		window_w;
 
 		move(horizontal, vertical, speed, time_elapsed_frame, &player_rect);;
+		move(horizontal_2, vertical_2, speed_2, time_elapsed_frame, &player_rect_2);;
 
 		border_collision(&player_rect, window_w, window_h);
+		border_collision(&player_rect_2, window_w, window_h);
 
 		// render
 		SDL_RenderPresent(renderer);
