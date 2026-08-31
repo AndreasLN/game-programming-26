@@ -2,7 +2,45 @@
 #include <SDL3/SDL.h>
 #include <iostream>
 
+class NPC {
+  public:
+    float size;
+	SDL_FRect * rect;
+	int horizontal;
+	int vertical;
+	double speed;
+	NPC(float size, int horizontal, int vertical, double speed, SDL_FRect * rect) { // Constructor with parameters
+      this->size = size;
+      this->horizontal = horizontal;
+      this->vertical = vertical;
+	  this->speed = speed;
+	  this->rect = rect;
+    }
 
+	void move(SDL_Time time_elapsed_frame){
+		(*rect).x += horizontal * speed * time_elapsed_frame;
+		(*rect).y += vertical * speed * time_elapsed_frame;
+	}
+	void border_collision(float window_w, float window_h){
+
+		if((*rect).x < 0){
+				(*rect).x = 0;
+				horizontal = 1;
+		}
+		if((*rect).x + (*rect).w > window_w){
+			(*rect).x = window_w - (*rect).w;
+			horizontal = -1;
+		}
+		if((*rect).y < 0){
+			(*rect).y = 0;
+			vertical = 1;
+		}
+		if((*rect).y + (*rect).h > window_h){
+			(*rect).y = window_h - (*rect).h;
+			vertical = -1;
+		}
+	}
+};
 
 void move(int horizontal, int vertical, double speed, SDL_Time time_elapsed_frame , SDL_FRect *player_rect)
 {
@@ -23,6 +61,23 @@ void border_collision(SDL_FRect *player_rect, float window_w, float window_h){
 	}
 	if((*player_rect).y + (*player_rect).h > window_h){
 		(*player_rect).y = window_h - (*player_rect).h;
+	}
+
+}
+
+void NPC_border_collision(NPC npc, float window_w, float window_h){
+
+	if((*npc.rect).x < 0){
+			(*npc.rect).x = 0;
+	}
+	if((*npc.rect).x + (*npc.rect).w > window_w){
+		(*npc.rect).x = window_w - (*npc.rect).w;
+	}
+	if((*npc.rect).y < 0){
+		(*npc.rect).y = 0;
+	}
+	if((*npc.rect).y + (*npc.rect).h > window_h){
+		(*npc.rect).y = window_h - (*npc.rect).h;
 	}
 
 }
@@ -81,6 +136,16 @@ int main(int argc, char* argv[])
 	int horizontal_2 = 0;
 	int vertical_2 = 0;
 	double speed_2 = 0.0000005;
+
+
+	SDL_FRect NPC_rect;
+
+	NPC npc(20, 1, 1, 0.0000001, &NPC_rect);
+
+	NPC_rect.w = npc.size;
+	NPC_rect.h = npc.size;
+	NPC_rect.x = window_w / 2 - npc.size / 2;
+	NPC_rect.y = window_h / 2 - npc.size / 2;
 
 
 
@@ -199,8 +264,12 @@ int main(int argc, char* argv[])
 		SDL_SetRenderDrawColor(renderer, 0x3C, 0x63, 0xFF, 0XFF);
 		SDL_RenderFillRect(renderer, &player_rect);
 
-		SDL_SetRenderDrawColor(renderer, 0x3C, 0x63, 0xFF, 0XFF);
+		SDL_SetRenderDrawColor(renderer, 0x3C, 0x63, 0x00, 0XFF);
 		SDL_RenderFillRect(renderer, &player_rect_2);
+
+		SDL_SetRenderDrawColor(renderer, 0x63, 0x00, 0x00, 0XFF);
+		SDL_RenderFillRect(renderer, npc.rect);
+
 
 		SDL_GetCurrentTime(&walltime_work_end);
 		//SDL_Log("%lu, %lu\n", walltime_work_end, walltime_frame_beg);
@@ -286,6 +355,9 @@ int main(int argc, char* argv[])
 		move(horizontal, vertical, speed, time_elapsed_frame, &player_rect);;
 		move(horizontal_2, vertical_2, speed_2, time_elapsed_frame, &player_rect_2);;
 
+		npc.move(time_elapsed_frame);
+
+		npc.border_collision(window_w, window_h);
 		border_collision(&player_rect, window_w, window_h);
 		border_collision(&player_rect_2, window_w, window_h);
 
