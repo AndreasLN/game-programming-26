@@ -5,6 +5,7 @@
 
 float window_w = 800;
 float window_h = 600;
+bool gave_over = false;
 
 
 class NPC {
@@ -14,13 +15,18 @@ class NPC {
 	int horizontal;
 	int vertical;
 	double speed;
-	NPC(float size, int horizontal, int vertical, double speed, SDL_FRect * rect) { // Constructor with parameters
+	NPC(float size, int horizontal, int vertical, double speed, SDL_FRect * rect, int start_x, int start_y) { // Constructor with parameters
       this->size = size;
       this->horizontal = horizontal;
       this->vertical = vertical;
 	  this->speed = speed;
 	  this->rect = rect;
+	  (*rect).w = size;
+	  (*rect).h = size;
+	  (*rect).x = start_x + size / 2;
+	  (*rect).y = start_y + size / 2;
     }
+
 
 	void move(SDL_Time time_elapsed_frame){
 		(*rect).x += horizontal * speed * time_elapsed_frame;
@@ -81,6 +87,12 @@ class Player {
 			}
 			if((*rect).y + (*rect).h > window_h){
 				(*rect).y = window_h - (*rect).h;
+			}
+		}
+		void npc_collision(NPC * npc){
+			if (SDL_HasRectIntersectionFloat(this->rect, (*npc).rect)){
+				SDL_Log("%s\n", "gave over");
+				gave_over = true;
 			}
 		}
 };
@@ -168,13 +180,18 @@ int main(int argc, char* argv[])
 	Player player_2(40.0f, 0, 0, 0.0000005, &player_rect_2);
 
 	SDL_FRect NPC_rect;
+	SDL_FRect NPC_rect_2;
+	SDL_FRect NPC_rect_3;
+	NPC npc(20, 1, 1, 0.0000001, &NPC_rect, 0, 0);
+	NPC npc2(20, -1, 1, 0.0000001, &NPC_rect_2, window_w - 20, 0);
+	NPC npc3(20, 1, -1, 0.0000001, &NPC_rect_3, 0, window_h - 20);
 
-	NPC npc(20, 1, 1, 0.0000001, &NPC_rect);
-
-	NPC_rect.w = npc.size;
-	NPC_rect.h = npc.size;
-	NPC_rect.x = window_w / 2 - npc.size / 2;
-	NPC_rect.y = window_h / 2 - npc.size / 2;
+	NPC * npcs[3]{
+		&npc,
+		&npc2,
+		&npc3,
+	};
+	
 
 	bool btn_pressed_up = false;
 
@@ -295,11 +312,13 @@ int main(int argc, char* argv[])
 		SDL_RenderFillRect(renderer, &player_rect_2);
 
 		SDL_SetRenderDrawColor(renderer, 0x63, 0x00, 0x00, 0XFF);
-		SDL_RenderFillRect(renderer, npc.rect);
-
+		
+		for (NPC * npc : npcs)
+		{
+			SDL_RenderFillRect(renderer, npc->rect);
+		}
 
 		SDL_GetCurrentTime(&walltime_work_end);
-		//SDL_Log("%lu, %lu\n", walltime_work_end, walltime_frame_beg);
 		time_elapsed_work = walltime_work_end - walltime_frame_beg;
 
 		if(target_framerate_ns > time_elapsed_work)
@@ -378,17 +397,26 @@ int main(int argc, char* argv[])
 		SDL_RenderDebugTextFormat(renderer, 10.0f, 50.0f, "time spent sleeping   : %9.6f ms", (float)time_elapsed_sleep/(float)1000000);
 		SDL_RenderDebugTextFormat(renderer, 10.0f, 60.0f, "time spent busywaiting: %9.6f ms", (float)time_elapsed_busywait/(float)1000000);
 
-
 		player_1.move(time_elapsed_frame);
 		player_2.move(time_elapsed_frame);
 
-		npc.move(time_elapsed_frame);
-
-		npc.border_collision(window_w, window_h);
+		for (NPC * npc : npcs)
+		{
+			
+			npc->move(time_elapsed_frame);
+			npc->border_collision(window_w, window_h);
+		}
+		
 		player_1.border_collision();
 		player_2.border_collision();
 
-		
+		for (NPC* npc : npcs)
+		{
+			if (!gave_over){
+				player_1.npc_collision(npc);
+				player_2.npc_collision(npc);
+			}	
+		}
 
 		// render
 		SDL_RenderPresent(renderer);
