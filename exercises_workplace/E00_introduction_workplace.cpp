@@ -2,6 +2,11 @@
 #include <SDL3/SDL.h>
 #include <iostream>
 
+
+float window_w = 800;
+float window_h = 600;
+
+
 class NPC {
   public:
     float size;
@@ -40,6 +45,44 @@ class NPC {
 			vertical = -1;
 		}
 	}
+};
+
+class Player {
+	public:
+		SDL_FRect * rect;
+		int horizontal;
+		int vertical;
+		double speed;
+		float player_size;
+		Player(float player_size, int horizontal, int vertical, double speed, SDL_FRect * rect) { // Constructor with parameters
+			this->player_size = player_size;
+			this->horizontal = horizontal;
+			this->vertical = vertical;
+			this->speed = speed;
+			this->rect = rect;
+			(*rect).w = player_size;
+			(*rect).h = player_size;
+			(*rect).x = window_w / 2 - player_size / 2;
+			(*rect).y = window_h / 2 - player_size / 2;
+		}
+		void move(SDL_Time time_elapsed_frame){
+			(*rect).x += horizontal * speed * time_elapsed_frame;
+			(*rect).y += vertical * speed * time_elapsed_frame;
+		}
+		void border_collision(){
+			if((*rect).x < 0){
+					(*rect).x = 0;
+			}
+			if((*rect).x + (*rect).w > window_w){
+				(*rect).x = window_w - (*rect).w;
+			}
+			if((*rect).y < 0){
+				(*rect).y = 0;
+			}
+			if((*rect).y + (*rect).h > window_h){
+				(*rect).y = window_h - (*rect).h;
+			}
+		}
 };
 
 void move(int horizontal, int vertical, double speed, SDL_Time time_elapsed_frame , SDL_FRect *player_rect)
@@ -84,8 +127,7 @@ void NPC_border_collision(NPC npc, float window_w, float window_h){
 
 int main(int argc, char* argv[])
 {
-	float window_w = 800;
-	float window_h = 600;
+
 	int target_framerate_ms = 1000 / 60;       // 16 milliseconds
 	int target_framerate_ns = 1000000000 / 60; // 16666666 nanoseconds
 
@@ -116,27 +158,14 @@ int main(int argc, char* argv[])
 	SDL_Time time_elapsed_busywait;
 
 	int delay_type = 0;
+	
 
-	float player_size = 40;
 	SDL_FRect player_rect;
-	player_rect.w = player_size;
-	player_rect.h = player_size;
-	player_rect.x = window_w / 2 - player_size / 2;
-	player_rect.y = window_h / 2 - player_size / 2;
-	int horizontal = 0;
-	int vertical = 0;
-	double speed = 0.0000005;
-
-	float player_size_2 = 40;
 	SDL_FRect player_rect_2;
-	player_rect_2.w = player_size_2;
-	player_rect_2.h = player_size_2;
-	player_rect_2.x = window_w / 2 - player_size_2 / 2;
-	player_rect_2.y = window_h / 2 - player_size_2 / 2;
-	int horizontal_2 = 0;
-	int vertical_2 = 0;
-	double speed_2 = 0.0000005;
 
+	Player player_1(40.0f, 0, 0, 0.0000005, &player_rect);
+	
+	Player player_2(40.0f, 0, 0, 0.0000005, &player_rect_2);
 
 	SDL_FRect NPC_rect;
 
@@ -146,8 +175,6 @@ int main(int argc, char* argv[])
 	NPC_rect.h = npc.size;
 	NPC_rect.x = window_w / 2 - npc.size / 2;
 	NPC_rect.y = window_h / 2 - npc.size / 2;
-
-
 
 	bool btn_pressed_up = false;
 
@@ -171,43 +198,43 @@ int main(int argc, char* argv[])
 						{
 						case SDLK_W:
 							//std::cout << "hello";
-							if(vertical < 0)
-								vertical = 0;
+							if(player_1.vertical < 0)
+								player_1.vertical = 0;
 							break;
 						case SDLK_A:
 							//cout << "LEFT";
-							if(horizontal < 0)
-								horizontal = 0;
+							if(player_1.horizontal < 0)
+								player_1.horizontal = 0;
 							break;
 						case SDLK_S:
 							//cout << "DOWN";
-							if(vertical > 0)
-								vertical = 0;
+							if(player_1.vertical > 0)
+								player_1.vertical = 0;
 							break;
 						case SDLK_D:
 							//cout << "RIGHT";
-							if(horizontal > 0)
-								horizontal = 0;
+							if(player_1.horizontal > 0)
+								player_1.horizontal = 0;
 							break;
 						case SDLK_UP:
 							//std::cout << "hello";
-							if(vertical_2 < 0)
-								vertical_2 = 0;
+							if(player_2.vertical < 0)
+								player_2.vertical = 0;
 							break;
 						case SDLK_LEFT:
 							//cout << "LEFT";
-							if(horizontal_2 < 0)
-								horizontal_2 = 0;
+							if(player_2.horizontal < 0)
+								player_2.horizontal = 0;
 							break;
 						case SDLK_DOWN:
 							//cout << "DOWN";
-							if(vertical_2 > 0)
-								vertical_2 = 0;
+							if(player_2.vertical > 0)
+								player_2.vertical = 0;
 							break;
 						case SDLK_RIGHT:
 							//cout << "RIGHT";
-							if(horizontal_2 > 0)
-								horizontal_2 = 0;
+							if(player_2.horizontal > 0)
+								player_2.horizontal = 0;
 							break;
 						}
 					break;
@@ -221,33 +248,33 @@ int main(int argc, char* argv[])
 						{
 							case SDLK_D:
 								//cout << "RIGHT";
-								horizontal = 1;
+								player_1.horizontal = 1;
 								break;
 							case SDLK_A:
 								//cout << "LEFT";
-								horizontal = -1;
+								player_1.horizontal = -1;
 								break;
 							case SDLK_W:
-								vertical = -1;
+								player_1.vertical = -1;
 								break;
 							case SDLK_S:
 								//cout << "DOWN";
-								vertical = 1;
+								player_1.vertical = 1;
 								break;
 							case SDLK_RIGHT:
 								//cout << "RIGHT";
-								horizontal_2 = 1;
+								player_2.horizontal = 1;
 								break;
 							case SDLK_LEFT:
 								//cout << "LEFT";
-								horizontal_2 = -1;
+								player_2.horizontal = -1;
 								break;
 							case SDLK_UP:
-								vertical_2 = -1;
+								player_2.vertical = -1;
 								break;
 							case SDLK_DOWN:
 								//cout << "DOWN";
-								vertical_2 = 1;
+								player_2.vertical = 1;
 								break;
 						}
 					}
@@ -352,14 +379,16 @@ int main(int argc, char* argv[])
 		SDL_RenderDebugTextFormat(renderer, 10.0f, 60.0f, "time spent busywaiting: %9.6f ms", (float)time_elapsed_busywait/(float)1000000);
 
 
-		move(horizontal, vertical, speed, time_elapsed_frame, &player_rect);;
-		move(horizontal_2, vertical_2, speed_2, time_elapsed_frame, &player_rect_2);;
+		player_1.move(time_elapsed_frame);
+		player_2.move(time_elapsed_frame);
 
 		npc.move(time_elapsed_frame);
 
 		npc.border_collision(window_w, window_h);
-		border_collision(&player_rect, window_w, window_h);
-		border_collision(&player_rect_2, window_w, window_h);
+		player_1.border_collision();
+		player_2.border_collision();
+
+		
 
 		// render
 		SDL_RenderPresent(renderer);
