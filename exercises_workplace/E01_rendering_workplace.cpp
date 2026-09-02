@@ -28,6 +28,9 @@
 const int NUM_ASTEROIDS = 10;
 const int NUM_PROJECTILES = 3;
 
+float window_w = 600;
+float window_h = 800;
+
 const int DEBUG_CIRCLE_POINT_COUNT = 8;
 const float TAU = 6.2831f; // PI*2
 
@@ -102,8 +105,7 @@ int main(void)
 	E01_GameState game_state  = { 0 };
 	E01_DesignParams design_params;
 
-	float window_w = 600;
-	float window_h = 800;
+
 	int target_framerate = SECONDS(1) / 60;
 
 	SDL_Window* window = SDL_CreateWindow("E01 - Rendering", window_w, window_h, 0);
@@ -243,6 +245,17 @@ static float distance_between_sq(SDL_FPoint a, SDL_FPoint b)
 	return dx*dx + dy*dy;
 }
 
+void border_teleport(E01_Entity * entity, float window_w){
+		if(entity->position.x < 0){
+			SDL_Log("%f", entity->position.x);
+			entity->position.x = window_w - entity->rect.w - 10;
+		}
+		else if(entity->position.x + entity->rect.w > window_w){
+			SDL_Log("%f", entity->position.x);
+			entity->position.x = 5;
+		}
+	}
+
 static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameState* game_state)
 {
 	// load textures
@@ -318,10 +331,11 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 {
 	// player
 	{
+
 		E01_Entity* entity_player = &game_state->player;
-		if(context->btn_pressed_up)
+		if(context->btn_pressed_up && entity_player->rect.y > 0)
 			entity_player->position.y -= context->delta * entity_player->velocity;
-		if(context->btn_pressed_down)
+		if(context->btn_pressed_down && entity_player->rect.y + entity_player->rect.h < window_h)
 			entity_player->position.y += context->delta * entity_player->velocity;
 		if(context->btn_pressed_left)
 			entity_player->position.x -= context->delta * entity_player->velocity;
@@ -359,8 +373,11 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 			
 		}
 
+		border_teleport(entity_player, window_w);
+
 		entity_player->rect.x = entity_player->position.x;
 		entity_player->rect.y = entity_player->position.y;
+
 		
 		SDL_SetTextureColorMod(entity_player->texture_atlas, 0xFF, 0xFF, 0xFF);
 		SDL_RenderTexture(
@@ -378,7 +395,7 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 
 		// how close an projectile must be before triggering a collision (64 pixels. We square it because we can avoid doing the square root later)
 		// the number 64 is obtained by summing togheter the "radii" of the sprites
-		const float collision_distance_sq = 50*50;
+		const float collision_distance_sq = 40*40;
 		bool deleted;
 		for (size_t i = 0; i < NUM_PROJECTILES; i++)
 		{
