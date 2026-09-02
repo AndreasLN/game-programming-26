@@ -67,7 +67,7 @@ struct E01_DesignParams
 	int   player_sprite_coords_x = 4;
 	int   player_sprite_coords_y = 0;
 
-	float projectile_speed = entity_size_world * 2;
+	float projectile_speed = entity_size_world * 4;
 	int	  projectile_sprite_coords_x = 4;
 	int	  projectile_sprite_coords_y = 3;
 	
@@ -377,6 +377,12 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 				projectile->position.y -= context->delta * projectile->velocity;	
 				projectile->rect.x = projectile->position.x;
 				projectile->rect.y = projectile->position.y;
+				
+				if(projectile->rect.y < 50){
+					delete projectile;
+					game_state->projectiles[i] = nullptr;
+				}
+
 				SDL_SetTextureColorMod(projectile->texture_atlas, 0xFF, 0xFF, 0xFF);
 				SDL_RenderTexture(
 					context->renderer,
@@ -384,7 +390,9 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 					&projectile->texture_rect,
 					&projectile->rect
 				);
+				
 			}
+
 		}
 		
 		//entity_projectile->position.y -= context->delta * entity_projectile->velocity;
