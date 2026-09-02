@@ -80,7 +80,7 @@ struct E01_DesignParams
 struct E01_GameState
 {
 	E01_Entity player;
-	E01_Entity asteroids[NUM_ASTEROIDS];
+	E01_Entity * asteroids[NUM_ASTEROIDS] = {nullptr};
 	E01_Entity * projectiles[NUM_PROJECTILES] = {nullptr};
 
 	SDL_Texture* texture_atlas;
@@ -292,7 +292,7 @@ static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameS
 	{
 		for(int i = 0; i < NUM_ASTEROIDS; ++i)
 		{
-			E01_Entity* asteroid_curr = &game_state->asteroids[i];
+			E01_Entity* asteroid_curr = new E01_Entity();
 
 			asteroid_curr->position.x = params->entity_size_world + SDL_randf() * (context->window_w - params->entity_size_world * 2);
 			asteroid_curr->position.y = -params->entity_size_world; // spawn asteroids off screen (almost)
@@ -308,6 +308,8 @@ static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameS
 
 			asteroid_curr->texture_rect.x = params->entity_size_texture * params->asteroid_sprite_coords_x;
 			asteroid_curr->texture_rect.y = params->entity_size_texture * params->asteroid_sprite_coords_y;
+		
+			game_state->asteroids[i] = asteroid_curr;
 		}
 	}
 }
@@ -395,20 +397,24 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 					//continue;
 				} 
 
-				for (int i = 0; i < NUM_ASTEROIDS; ++i)
+				for (size_t j = 0; j < NUM_ASTEROIDS; ++j)
 				{
-					E01_Entity* asteroid_curr = &game_state->asteroids[i];
-					float distance_sq = distance_between_sq(asteroid_curr->position, projectile->position);
-					//SDL_Log("%f", distance_sq);
-					if(distance_sq < collision_distance_sq){
-						deleted = true;
-						break;
-					}
+					if(game_state->asteroids[j] != nullptr){
+						E01_Entity* asteroid_curr = game_state->asteroids[j];
+						float distance_sq = distance_between_sq(asteroid_curr->position, projectile->position);
+						//SDL_Log("%f", distance_sq);
+						if(distance_sq < collision_distance_sq){
+							deleted = true;
+							delete asteroid_curr;
+							game_state->asteroids[j] = nullptr;
+							break;
+						}
+					}	
 				}
 				if (deleted){
 					game_state->projectiles[i] = nullptr;
 					delete projectile;
-					continue;;
+					continue;
 				}
 				
 
@@ -439,26 +445,30 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 
 		for(int i = 0; i < NUM_ASTEROIDS; ++i)
 		{
-			E01_Entity* asteroid_curr = &game_state->asteroids[i];
-			asteroid_curr->position.y += context->delta * asteroid_curr->velocity;
+			if (game_state->asteroids[i] != nullptr){
+				E01_Entity* asteroid_curr = game_state->asteroids[i];
+				asteroid_curr->position.y += context->delta * asteroid_curr->velocity;
 
-			asteroid_curr->rect.x = asteroid_curr->position.x;
-			asteroid_curr->rect.y = asteroid_curr->position.y;
+				asteroid_curr->rect.x = asteroid_curr->position.x;
+				asteroid_curr->rect.y = asteroid_curr->position.y;
 
-			float distance_sq = distance_between_sq(asteroid_curr->position, game_state->player.position);
-			if(distance_sq < collision_distance_sq)
-				SDL_SetTextureColorMod(asteroid_curr->texture_atlas, 0xFF, 0x00, 0x00);
-			else if(distance_sq < warning_distance_sq)
-				SDL_SetTextureColorMod(asteroid_curr->texture_atlas, 0xCC, 0xCC, 0x00);
-			else
-				SDL_SetTextureColorMod(asteroid_curr->texture_atlas, 0xFF, 0xFF, 0xFF); // white
+				float distance_sq = distance_between_sq(asteroid_curr->position, game_state->player.position);
+				if(distance_sq < collision_distance_sq)
+					SDL_SetTextureColorMod(asteroid_curr->texture_atlas, 0xFF, 0x00, 0x00);
+				else if(distance_sq < warning_distance_sq)
+					SDL_SetTextureColorMod(asteroid_curr->texture_atlas, 0xCC, 0xCC, 0x00);
+				else
+					SDL_SetTextureColorMod(asteroid_curr->texture_atlas, 0xFF, 0xFF, 0xFF); // white
 
-			SDL_RenderTexture(
-				context->renderer,
-				asteroid_curr->texture_atlas,
-				&asteroid_curr->texture_rect,
-				&asteroid_curr->rect
-			);
+				SDL_RenderTexture(
+					context->renderer,
+					asteroid_curr->texture_atlas,
+					&asteroid_curr->texture_rect,
+					&asteroid_curr->rect
+				);
+
+			}
+			
 		}
 	}
 }
