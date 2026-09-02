@@ -289,23 +289,7 @@ static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameS
 
 	// projectiles
 	{
-		game_state->projectile.position.x = context->window_w / 2 - params->entity_size_world / 2;
-		game_state->projectile.position.y = context->window_h - params->entity_size_world * 2;
-		game_state->projectile.size = params->entity_size_world;
-		game_state->projectile.velocity = params->projectile_speed;
-		game_state->projectile.texture_atlas = game_state->texture_atlas;
-
-		// player size in the game world
-		game_state->projectile.rect.w = game_state->projectile.size;
-		game_state->projectile.rect.h = game_state->projectile.size;
-
-		// sprite size (in the tilemap)
-		game_state->projectile.texture_rect.w = params->entity_size_texture;
-		game_state->projectile.texture_rect.h = params->entity_size_texture;
-		// sprite position (in the tilemap)
-		game_state->projectile.texture_rect.x = params->entity_size_texture * params->projectile_sprite_coords_x;
-		game_state->projectile.texture_rect.y = params->entity_size_texture * params->projectile_sprite_coords_y;
-
+		
 	}
 
 	// asteroids
@@ -350,10 +334,10 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 			
 			context->space_ready = false;
 			SDL_Log("SPAWN PROJECTILE");
-			game_state->projectile.position.x = context->window_w / 2 - params->entity_size_world / 2;
-			game_state->projectile.position.y = context->window_h - params->entity_size_world * 2;
+			game_state->projectile.position.x = entity_player->position.x;
+			game_state->projectile.position.y = entity_player->position.y;
 			game_state->projectile.size = params->entity_size_world;
-			game_state->projectile.velocity = 0;
+			game_state->projectile.velocity = params->projectile_speed;
 			game_state->projectile.texture_atlas = game_state->texture_atlas;
 
 			// player size in the game world
@@ -366,14 +350,18 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 			// sprite position (in the tilemap)
 			game_state->projectile.texture_rect.x = params->entity_size_texture * params->projectile_sprite_coords_x;
 			game_state->projectile.texture_rect.y = params->entity_size_texture * params->projectile_sprite_coords_y;
-			
+
 		}
 
 		entity_player->rect.x = entity_player->position.x;
 		entity_player->rect.y = entity_player->position.y;
 
+		entity_projectile->position.y -= context->delta * entity_projectile->velocity;
+
 		entity_projectile->rect.x = entity_projectile->position.x;
 		entity_projectile->rect.y = entity_projectile->position.y;
+
+
 		SDL_SetTextureColorMod(entity_player->texture_atlas, 0xFF, 0xFF, 0xFF);
 		SDL_RenderTexture(
 			context->renderer,
