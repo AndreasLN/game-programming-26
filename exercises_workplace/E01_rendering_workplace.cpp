@@ -26,6 +26,7 @@
 #define NS_TO_SECONDS(x) ((float)(x)/(float)1000000000) // converts nanoseconds to seconds (in floating point precision)
 
 const int NUM_ASTEROIDS = 10;
+const int NUM_PROJECTILES = 3;
 
 const int DEBUG_CIRCLE_POINT_COUNT = 8;
 const float TAU = 6.2831f; // PI*2
@@ -80,7 +81,7 @@ struct E01_GameState
 {
 	E01_Entity player;
 	E01_Entity asteroids[NUM_ASTEROIDS];
-	E01_Entity projectile;
+	E01_Entity * projectiles[NUM_PROJECTILES] = {nullptr};
 
 	SDL_Texture* texture_atlas;
 };
@@ -289,6 +290,11 @@ static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameS
 
 	// projectiles
 	{
+		for (size_t i = 0; i < NUM_PROJECTILES; i++)
+		{
+			SDL_Log("NULLIFYING");
+			game_state->projectiles[i] = nullptr;
+		}
 		
 	}
 
@@ -318,7 +324,6 @@ static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameS
 
 static void update(E01_EngineContext* context, E01_DesignParams* params, E01_GameState* game_state)
 {
-	E01_Entity* entity_projectile = &game_state->projectile;
 	// player
 	{
 		E01_Entity* entity_player = &game_state->player;
@@ -332,34 +337,60 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 			entity_player->position.x += context->delta * entity_player->velocity;
 		if(context->btn_pressed_space && context->space_ready){
 			
+			for (size_t i = 0; i < NUM_PROJECTILES; i++)
+			{
+				if (game_state->projectiles[i] == nullptr){
+					SDL_Log("SPAWN PROJECTILE");
+					E01_Entity* entity_projectile = new E01_Entity();
+					(*entity_projectile).position.x = entity_player->position.x;
+					(*entity_projectile).position.y = entity_player->position.y;
+					(*entity_projectile).size = params->entity_size_world;
+					(*entity_projectile).velocity = params->projectile_speed;
+					(*entity_projectile).texture_atlas = game_state->texture_atlas;
+
+					// player size in the game world
+					(*entity_projectile).rect.w = (*entity_projectile).size;
+					(*entity_projectile).rect.h = (*entity_projectile).size;
+
+					// sprite size (in the tilemap)
+					(*entity_projectile).texture_rect.w = params->entity_size_texture;
+					(*entity_projectile).texture_rect.h = params->entity_size_texture;
+					// sprite position (in the tilemap)
+					(*entity_projectile).texture_rect.x = params->entity_size_texture * params->projectile_sprite_coords_x;
+					(*entity_projectile).texture_rect.y = params->entity_size_texture * params->projectile_sprite_coords_y;
+					game_state->projectiles[i] = entity_projectile;
+					break;
+				}
+			}
+			
 			context->space_ready = false;
-			SDL_Log("SPAWN PROJECTILE");
-			game_state->projectile.position.x = entity_player->position.x;
-			game_state->projectile.position.y = entity_player->position.y;
-			game_state->projectile.size = params->entity_size_world;
-			game_state->projectile.velocity = params->projectile_speed;
-			game_state->projectile.texture_atlas = game_state->texture_atlas;
-
-			// player size in the game world
-			game_state->projectile.rect.w = game_state->projectile.size;
-			game_state->projectile.rect.h = game_state->projectile.size;
-
-			// sprite size (in the tilemap)
-			game_state->projectile.texture_rect.w = params->entity_size_texture;
-			game_state->projectile.texture_rect.h = params->entity_size_texture;
-			// sprite position (in the tilemap)
-			game_state->projectile.texture_rect.x = params->entity_size_texture * params->projectile_sprite_coords_x;
-			game_state->projectile.texture_rect.y = params->entity_size_texture * params->projectile_sprite_coords_y;
-
+			
 		}
 
 		entity_player->rect.x = entity_player->position.x;
 		entity_player->rect.y = entity_player->position.y;
+		for (size_t i = 0; i < NUM_PROJECTILES; i++)
+		{
+			if(game_state->projectiles[i] != nullptr){
 
-		entity_projectile->position.y -= context->delta * entity_projectile->velocity;
+				E01_Entity* projectile = game_state->projectiles[i];
+				projectile->position.y -= context->delta * projectile->velocity;	
+				projectile->rect.x = projectile->position.x;
+				projectile->rect.y = projectile->position.y;
+				SDL_SetTextureColorMod(projectile->texture_atlas, 0xFF, 0xFF, 0xFF);
+				SDL_RenderTexture(
+					context->renderer,
+					projectile->texture_atlas,
+					&projectile->texture_rect,
+					&projectile->rect
+				);
+			}
+		}
+		
+		//entity_projectile->position.y -= context->delta * entity_projectile->velocity;
 
-		entity_projectile->rect.x = entity_projectile->position.x;
-		entity_projectile->rect.y = entity_projectile->position.y;
+		//entity_projectile->rect.x = entity_projectile->position.x;
+		//entity_projectile->rect.y = entity_projectile->position.y;
 
 
 		SDL_SetTextureColorMod(entity_player->texture_atlas, 0xFF, 0xFF, 0xFF);
@@ -369,13 +400,7 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 			&entity_player->texture_rect,
 			&entity_player->rect
 		);
-		SDL_SetTextureColorMod(entity_projectile->texture_atlas, 0xFF, 0xFF, 0xFF);
-		SDL_RenderTexture(
-			context->renderer,
-			entity_projectile->texture_atlas,
-			&entity_projectile->texture_rect,
-			&entity_projectile->rect
-		);
+		
 	}
 
 	// projectiles
