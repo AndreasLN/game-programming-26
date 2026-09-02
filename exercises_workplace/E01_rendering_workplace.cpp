@@ -31,6 +31,8 @@ const int NUM_PROJECTILES = 3;
 float window_w = 600;
 float window_h = 800;
 
+
+
 const int DEBUG_CIRCLE_POINT_COUNT = 8;
 const float TAU = 6.2831f; // PI*2
 
@@ -87,6 +89,7 @@ struct E01_GameState
 	E01_Entity * projectiles[NUM_PROJECTILES] = {nullptr};
 
 	SDL_Texture* texture_atlas;
+	bool reset;
 };
 
 void         draw_circle(E01_EngineContext* context, float x, float y, float radius);
@@ -123,88 +126,84 @@ int main(void)
 	}
 
 	bool quit = false;
-
 	SDL_Time walltime_frame_beg;
 	SDL_Time walltime_work_end;
 	SDL_Time walltime_frame_end;
 	SDL_Time time_elapsed_frame;
 	SDL_Time time_elapsed_work;
 
-	init(&context, &design_params, &game_state);
-
-	SDL_GetCurrentTime(&walltime_frame_beg);
-	while(!quit)
-	{
-		// input
-		SDL_Event event;
-		while(SDL_PollEvent(&event))
+	while(!quit){
+		init(&context, &design_params, &game_state);
+		SDL_GetCurrentTime(&walltime_frame_beg);
+		while(game_state.reset != true)
 		{
-			switch(event.type)
+			// input
+			SDL_Event event;
+			while(SDL_PollEvent(&event))
 			{
-				case SDL_EVENT_QUIT:
-					quit = true;
-					break;
+				switch(event.type)
+				{
+					case SDL_EVENT_QUIT:
+						quit = true;
+						game_state.reset = true;
+						break;
 
-				case SDL_EVENT_KEY_UP:
+					case SDL_EVENT_KEY_UP:
 
-				case SDL_EVENT_KEY_DOWN:
-					if(event.key.key == SDLK_W)
-						context.btn_pressed_up = event.key.down;
-					if(event.key.key == SDLK_A)
-						context.btn_pressed_left = event.key.down;
-					if(event.key.key == SDLK_S)
-						context.btn_pressed_down = event.key.down;
-					if(event.key.key == SDLK_D)
-						context.btn_pressed_right = event.key.down;
-					if(event.key.key == SDLK_SPACE){
-						context.btn_pressed_space = event.key.down;
-						if (!event.key.down){
-							context.space_ready = true;
-						}
-					}
-					
+					case SDL_EVENT_KEY_DOWN:
+						if(event.key.key == SDLK_W)
+							context.btn_pressed_up = event.key.down;
+						if(event.key.key == SDLK_A)
+							context.btn_pressed_left = event.key.down;
+						if(event.key.key == SDLK_S)
+							context.btn_pressed_down = event.key.down;
+						if(event.key.key == SDLK_D)
+							context.btn_pressed_right = event.key.down;
+						if(event.key.key == SDLK_SPACE){
+							context.btn_pressed_space = event.key.down;
+							if (!event.key.down){
+								context.space_ready = true;
+							}
+						}						
+				}
 			}
+
+			// clear screen
+			SDL_SetRenderDrawColor(context.renderer, 0x00, 0x00, 0x00, 0x00);
+			SDL_RenderClear(context.renderer);
+
+			update(&context, &design_params, &game_state);
+			SDL_GetCurrentTime(&walltime_work_end);
+			time_elapsed_work = walltime_work_end - walltime_frame_beg;
+
+			if(target_framerate > time_elapsed_work)
+			{
+				SDL_DelayPrecise(target_framerate - time_elapsed_work);
+			}
+
+			SDL_GetCurrentTime(&walltime_frame_end);
+			time_elapsed_frame = walltime_frame_end - walltime_frame_beg;
+
+			context.delta = NS_TO_SECONDS(time_elapsed_frame);
+
+	#ifdef ENABLE_DIAGNOSTICS
+			{
+				// draw semi-transparent background
+				const SDL_FRect rect = SDL_FRect{ 5, 5, 305, 35 };
+				SDL_SetRenderDrawColor(context.renderer, 0x00, 0x00, 0x00, 0x99);
+				SDL_RenderFillRect(context.renderer, &rect);
+
+				// draw statistics text
+				SDL_SetRenderDrawColor(context.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+				SDL_RenderDebugTextFormat(context.renderer, 10.0f, 10.0f, "elapsed (frame): %9.6f ms", NS_TO_MILLIS(time_elapsed_frame));
+				SDL_RenderDebugTextFormat(context.renderer, 10.0f, 20.0f, "elapsed(work)  : %9.6f ms", NS_TO_MILLIS(time_elapsed_work));
+			}
+	#endif
+			// render
+			SDL_RenderPresent(context.renderer);
+			walltime_frame_beg = walltime_frame_end;
 		}
-
-		// clear screen
-		SDL_SetRenderDrawColor(context.renderer, 0x00, 0x00, 0x00, 0x00);
-		SDL_RenderClear(context.renderer);
-
-		update(&context, &design_params, &game_state);
-
-		SDL_GetCurrentTime(&walltime_work_end);
-		time_elapsed_work = walltime_work_end - walltime_frame_beg;
-
-		if(target_framerate > time_elapsed_work)
-		{
-			SDL_DelayPrecise(target_framerate - time_elapsed_work);
-		}
-
-		SDL_GetCurrentTime(&walltime_frame_end);
-		time_elapsed_frame = walltime_frame_end - walltime_frame_beg;
-
-		context.delta = NS_TO_SECONDS(time_elapsed_frame);
-
-#ifdef ENABLE_DIAGNOSTICS
-		{
-			// draw semi-transparent background
-			const SDL_FRect rect = SDL_FRect{ 5, 5, 305, 35 };
-			SDL_SetRenderDrawColor(context.renderer, 0x00, 0x00, 0x00, 0x99);
-			SDL_RenderFillRect(context.renderer, &rect);
-
-			// draw statistics text
-			SDL_SetRenderDrawColor(context.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
-			SDL_RenderDebugTextFormat(context.renderer, 10.0f, 10.0f, "elapsed (frame): %9.6f ms", NS_TO_MILLIS(time_elapsed_frame));
-			SDL_RenderDebugTextFormat(context.renderer, 10.0f, 20.0f, "elapsed(work)  : %9.6f ms", NS_TO_MILLIS(time_elapsed_work));
-		}
-#endif
-
-		// render
-		SDL_RenderPresent(context.renderer);
-
-		walltime_frame_beg = walltime_frame_end;
 	}
-
 	SDL_Quit();
 	
 	return 0;
@@ -247,17 +246,20 @@ static float distance_between_sq(SDL_FPoint a, SDL_FPoint b)
 
 void border_teleport(E01_Entity * entity, float window_w){
 		if(entity->position.x < 0){
-			SDL_Log("%f", entity->position.x);
 			entity->position.x = window_w - entity->rect.w - 10;
 		}
 		else if(entity->position.x + entity->rect.w > window_w){
-			SDL_Log("%f", entity->position.x);
 			entity->position.x = 5;
 		}
 	}
 
 static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameState* game_state)
 {
+	//
+	{
+		game_state->reset = false;
+	}
+
 	// load textures
 	{
 		int w = 0;
@@ -301,10 +303,19 @@ static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameS
 		game_state->player.texture_rect.y = params->entity_size_texture * params->player_sprite_coords_y;
 	}
 
+	// projectiles
+	{
+		for (size_t i = 0; i < NUM_PROJECTILES; i++)
+		{
+			game_state->projectiles[i] = nullptr;
+		}
+	}
+
 	// asteroids
 	{
 		for(int i = 0; i < NUM_ASTEROIDS; ++i)
 		{
+			game_state->asteroids[i] = nullptr;
 			E01_Entity* asteroid_curr = new E01_Entity();
 
 			asteroid_curr->position.x = params->entity_size_world + SDL_randf() * (context->window_w - params->entity_size_world * 2);
@@ -331,7 +342,6 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 {
 	// player
 	{
-
 		E01_Entity* entity_player = &game_state->player;
 		if(context->btn_pressed_up && entity_player->rect.y > 0)
 			entity_player->position.y -= context->delta * entity_player->velocity;
@@ -342,11 +352,9 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 		if(context->btn_pressed_right)
 			entity_player->position.x += context->delta * entity_player->velocity;
 		if(context->btn_pressed_space && context->space_ready){
-			
 			for (size_t i = 0; i < NUM_PROJECTILES; i++)
 			{
 				if (game_state->projectiles[i] == nullptr){
-					SDL_Log("SPAWN PROJECTILE");
 					E01_Entity* entity_projectile = new E01_Entity();
 					(*entity_projectile).position.x = entity_player->position.x;
 					(*entity_projectile).position.y = entity_player->position.y;
@@ -368,9 +376,7 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 					break;
 				}
 			}
-			
 			context->space_ready = false;
-			
 		}
 
 		border_teleport(entity_player, window_w);
@@ -378,7 +384,6 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 		entity_player->rect.x = entity_player->position.x;
 		entity_player->rect.y = entity_player->position.y;
 
-		
 		SDL_SetTextureColorMod(entity_player->texture_atlas, 0xFF, 0xFF, 0xFF);
 		SDL_RenderTexture(
 			context->renderer,
@@ -386,13 +391,10 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 			&entity_player->texture_rect,
 			&entity_player->rect
 		);
-		
 	}
 
 	// projectiles
 	{
-
-
 		// how close an projectile must be before triggering a collision (64 pixels. We square it because we can avoid doing the square root later)
 		// the number 64 is obtained by summing togheter the "radii" of the sprites
 		const float collision_distance_sq = 40*40;
@@ -400,7 +402,6 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 		for (size_t i = 0; i < NUM_PROJECTILES; i++)
 		{
 			deleted = false;
-
 			if(game_state->projectiles[i] != nullptr){
 
 				E01_Entity* projectile = game_state->projectiles[i];
@@ -409,17 +410,13 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 				projectile->rect.y = projectile->position.y;
 				
 				if(projectile->rect.y < 50){
-					
 					deleted = true;
-					//continue;
 				} 
-
 				for (size_t j = 0; j < NUM_ASTEROIDS; ++j)
 				{
 					if(game_state->asteroids[j] != nullptr){
 						E01_Entity* asteroid_curr = game_state->asteroids[j];
 						float distance_sq = distance_between_sq(asteroid_curr->position, projectile->position);
-						//SDL_Log("%f", distance_sq);
 						if(distance_sq < collision_distance_sq){
 							deleted = true;
 							delete asteroid_curr;
@@ -433,8 +430,6 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 					delete projectile;
 					continue;
 				}
-				
-
 				SDL_SetTextureColorMod(projectile->texture_atlas, 0xFF, 0xFF, 0xFF);
 				SDL_RenderTexture(
 					context->renderer,
@@ -446,19 +441,16 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 			}
 
 		}
-		
-
-
 	}
 
 	// asteroids
 	{
 		// how close an asteroid must be before categorizing it as "too close" (100 pixels. We square it because we can avoid doing the square root later)
-		const float warning_distance_sq = 100*100;
+		const float warning_distance_sq = 72*72;
 
 		// how close an asteroid must be before triggering a collision (64 pixels. We square it because we can avoid doing the square root later)
 		// the number 64 is obtained by summing togheter the "radii" of the sprites
-		const float collision_distance_sq = 64*64;
+		const float collision_distance_sq = 48*48;
 
 		for(int i = 0; i < NUM_ASTEROIDS; ++i)
 		{
@@ -470,8 +462,10 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 				asteroid_curr->rect.y = asteroid_curr->position.y;
 
 				float distance_sq = distance_between_sq(asteroid_curr->position, game_state->player.position);
-				if(distance_sq < collision_distance_sq)
+				if(distance_sq < collision_distance_sq){
 					SDL_SetTextureColorMod(asteroid_curr->texture_atlas, 0xFF, 0x00, 0x00);
+					game_state->reset = true;
+				}
 				else if(distance_sq < warning_distance_sq)
 					SDL_SetTextureColorMod(asteroid_curr->texture_atlas, 0xCC, 0xCC, 0x00);
 				else
