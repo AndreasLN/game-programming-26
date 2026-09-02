@@ -288,16 +288,6 @@ static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameS
 		game_state->player.texture_rect.y = params->entity_size_texture * params->player_sprite_coords_y;
 	}
 
-	// projectiles
-	{
-		for (size_t i = 0; i < NUM_PROJECTILES; i++)
-		{
-			SDL_Log("NULLIFYING");
-			game_state->projectiles[i] = nullptr;
-		}
-		
-	}
-
 	// asteroids
 	{
 		for(int i = 0; i < NUM_ASTEROIDS; ++i)
@@ -369,8 +359,29 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 
 		entity_player->rect.x = entity_player->position.x;
 		entity_player->rect.y = entity_player->position.y;
+		
+		SDL_SetTextureColorMod(entity_player->texture_atlas, 0xFF, 0xFF, 0xFF);
+		SDL_RenderTexture(
+			context->renderer,
+			entity_player->texture_atlas,
+			&entity_player->texture_rect,
+			&entity_player->rect
+		);
+		
+	}
+
+	// projectiles
+	{
+
+
+		// how close an projectile must be before triggering a collision (64 pixels. We square it because we can avoid doing the square root later)
+		// the number 64 is obtained by summing togheter the "radii" of the sprites
+		const float collision_distance_sq = 50*50;
+		bool deleted;
 		for (size_t i = 0; i < NUM_PROJECTILES; i++)
 		{
+			deleted = false;
+
 			if(game_state->projectiles[i] != nullptr){
 
 				E01_Entity* projectile = game_state->projectiles[i];
@@ -379,9 +390,27 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 				projectile->rect.y = projectile->position.y;
 				
 				if(projectile->rect.y < 50){
-					delete projectile;
-					game_state->projectiles[i] = nullptr;
+					
+					deleted = true;
+					//continue;
+				} 
+
+				for (int i = 0; i < NUM_ASTEROIDS; ++i)
+				{
+					E01_Entity* asteroid_curr = &game_state->asteroids[i];
+					float distance_sq = distance_between_sq(asteroid_curr->position, projectile->position);
+					//SDL_Log("%f", distance_sq);
+					if(distance_sq < collision_distance_sq){
+						deleted = true;
+						break;
+					}
 				}
+				if (deleted){
+					game_state->projectiles[i] = nullptr;
+					delete projectile;
+					continue;;
+				}
+				
 
 				SDL_SetTextureColorMod(projectile->texture_atlas, 0xFF, 0xFF, 0xFF);
 				SDL_RenderTexture(
@@ -395,24 +424,6 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 
 		}
 		
-		//entity_projectile->position.y -= context->delta * entity_projectile->velocity;
-
-		//entity_projectile->rect.x = entity_projectile->position.x;
-		//entity_projectile->rect.y = entity_projectile->position.y;
-
-
-		SDL_SetTextureColorMod(entity_player->texture_atlas, 0xFF, 0xFF, 0xFF);
-		SDL_RenderTexture(
-			context->renderer,
-			entity_player->texture_atlas,
-			&entity_player->texture_rect,
-			&entity_player->rect
-		);
-		
-	}
-
-	// projectiles
-	{
 
 
 	}
