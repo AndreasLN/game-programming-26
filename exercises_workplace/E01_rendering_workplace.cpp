@@ -57,7 +57,8 @@ struct E01_Entity
 	SDL_FPoint   position;
 	float        size;
 	float        velocity;
-
+	float		 rotation_speed = 0;
+	float		 rotation_value = 0;
 	SDL_FRect    rect;
 	SDL_Texture* texture_atlas;
 	SDL_FRect    texture_rect;
@@ -78,8 +79,11 @@ struct E01_DesignParams
 	
 	float asteroid_speed_min   = entity_size_world * 2;
 	float asteroid_speed_range = entity_size_world * 4;
+	float asteroid_rotation_speed_min   = -2;
+	float asteroid_rotation_speed_range = 4;
 	int   asteroid_sprite_coords_x = 0;
 	int   asteroid_sprite_coords_y = 4;
+
 };
 
 struct E01_GameState
@@ -323,6 +327,8 @@ static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameS
 			asteroid_curr->size       = params->entity_size_world;
 			asteroid_curr->velocity   = params->asteroid_speed_min + SDL_randf() * params->asteroid_speed_range;
 			asteroid_curr->texture_atlas = game_state->texture_atlas;
+			
+			asteroid_curr->rotation_speed = params->asteroid_rotation_speed_min + SDL_randf() * params->asteroid_rotation_speed_range;
 
 			asteroid_curr->rect.w = asteroid_curr->size;
 			asteroid_curr->rect.h = asteroid_curr->size;
@@ -437,9 +443,7 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 					&projectile->texture_rect,
 					&projectile->rect
 				);
-				
 			}
-
 		}
 	}
 
@@ -461,6 +465,8 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 				asteroid_curr->rect.x = asteroid_curr->position.x;
 				asteroid_curr->rect.y = asteroid_curr->position.y;
 
+				
+
 				float distance_sq = distance_between_sq(asteroid_curr->position, game_state->player.position);
 				if(distance_sq < collision_distance_sq){
 					SDL_SetTextureColorMod(asteroid_curr->texture_atlas, 0xFF, 0x00, 0x00);
@@ -471,12 +477,15 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 				else
 					SDL_SetTextureColorMod(asteroid_curr->texture_atlas, 0xFF, 0xFF, 0xFF); // white
 
-				SDL_RenderTexture(
-					context->renderer,
+				asteroid_curr->rotation_value = asteroid_curr->rotation_value + asteroid_curr->rotation_speed;
+				SDL_RenderTextureRotated(
+					context->renderer, 
 					asteroid_curr->texture_atlas,
-					&asteroid_curr->texture_rect,
-					&asteroid_curr->rect
-				);
+                    &asteroid_curr->texture_rect,
+					&asteroid_curr->rect,
+                    asteroid_curr->rotation_value, 
+					NULL,
+                    SDL_FLIP_NONE);
 
 			}
 			
