@@ -328,7 +328,7 @@ static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameS
 			E01_Entity* asteroid_curr = new E01_Entity();
 			asteroid_curr->position.x = params->entity_size_world + SDL_randf() * (context->window_w - params->entity_size_world * 2);
 			asteroid_curr->position.y = -params->entity_size_world; // spawn asteroids off screen (almost)
-			asteroid_curr->size       = params->entity_size_world + SDL_randf() * (params->entity_size_world * 4);
+			asteroid_curr->size       = params->entity_size_world + SDL_randf() * (params->entity_size_world * 2);
 			asteroid_curr->collision_radius_squared = (asteroid_curr->size * 0.4) * (asteroid_curr->size * 0.4);
 			asteroid_curr->velocity   = params->asteroid_speed_min + SDL_randf() * params->asteroid_speed_range;
 			asteroid_curr->texture_atlas = game_state->texture_atlas;
@@ -441,7 +441,7 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 						if(distance_sq < asteroid_curr->collision_radius_squared){
 							deleted = true;
 							// Create more asteroid if large enough
-							if (asteroid_curr->size > params->entity_size_world * 3){
+							if (asteroid_curr->size > params->entity_size_world * 2){
 								// 3 creations
 								for(int l = 0; l < 3; l++)
 								{
