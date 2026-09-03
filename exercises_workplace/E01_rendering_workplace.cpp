@@ -327,8 +327,8 @@ static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameS
 		{
 			E01_Entity* asteroid_curr = new E01_Entity();
 			asteroid_curr->position.x = params->entity_size_world + SDL_randf() * (context->window_w - params->entity_size_world * 2);
-			asteroid_curr->position.y = -params->entity_size_world; // spawn asteroids off screen (almost)
 			asteroid_curr->size       = params->entity_size_world + SDL_randf() * (params->entity_size_world * 2);
+			asteroid_curr->position.y = -asteroid_curr->size; // spawn asteroids off screen (almost)
 			asteroid_curr->collision_radius_squared = (asteroid_curr->size * 0.4) * (asteroid_curr->size * 0.4);
 			asteroid_curr->velocity   = params->asteroid_speed_min + SDL_randf() * params->asteroid_speed_range;
 			asteroid_curr->texture_atlas = game_state->texture_atlas;
@@ -518,9 +518,14 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 				E01_Entity* asteroid_curr = game_state->asteroids[i];
 				asteroid_curr->position.y += context->delta * asteroid_curr->velocity;
 
+				if (asteroid_curr->rect.y > window_h + 10){
+					asteroid_curr->position.y = -asteroid_curr->size;
+				}
+
 				asteroid_curr->rect.x = asteroid_curr->position.x;
 				asteroid_curr->rect.y = asteroid_curr->position.y;
 
+				
 				SDL_FPoint center = {
 					asteroid_curr->position.x + asteroid_curr->size * 0.5f,
 					asteroid_curr->position.y + asteroid_curr->size * 0.5f};
