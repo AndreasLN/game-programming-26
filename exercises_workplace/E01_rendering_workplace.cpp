@@ -420,13 +420,23 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 				
 				if(projectile->rect.y < 50){
 					deleted = true;
-				} 
+				}
+				SDL_FPoint projectile_center = {
+					projectile->position.x + projectile->size * 0.5f,
+					projectile->position.y + projectile->size * 0.5f
+				};
 				for (size_t j = 0; j < NUM_ASTEROIDS; ++j)
 				{
 					if(game_state->asteroids[j] != nullptr){
 						E01_Entity* asteroid_curr = game_state->asteroids[j];
-						float distance_sq = distance_between_sq(asteroid_curr->position, projectile->position);
-						if(distance_sq < collision_distance_sq){
+						
+						SDL_FPoint asteroid_center = {
+							asteroid_curr->position.x + asteroid_curr->size * 0.5f,
+							asteroid_curr->position.y + asteroid_curr->size * 0.5f
+						};
+						
+						float distance_sq = distance_between_sq(asteroid_center, projectile_center);
+						if(distance_sq < asteroid_curr->collision_radius_squared){
 							deleted = true;
 							delete asteroid_curr;
 							game_state->asteroids[j] = nullptr;
