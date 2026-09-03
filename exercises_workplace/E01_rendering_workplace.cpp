@@ -26,6 +26,7 @@
 #define NS_TO_SECONDS(x) ((float)(x)/(float)1000000000) // converts nanoseconds to seconds (in floating point precision)
 
 const int NUM_ASTEROIDS = 10;
+const int MAX_NUM_ASTEROIDS = 30;
 const int NUM_PROJECTILES = 3;
 
 float window_w = 600;
@@ -90,7 +91,7 @@ struct E01_DesignParams
 struct E01_GameState
 {
 	E01_Entity player;
-	E01_Entity * asteroids[NUM_ASTEROIDS] = {nullptr};
+	E01_Entity * asteroids[MAX_NUM_ASTEROIDS] = {nullptr};
 	E01_Entity * projectiles[NUM_PROJECTILES] = {nullptr};
 
 	SDL_Texture* texture_atlas;
@@ -318,12 +319,13 @@ static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameS
 
 	// asteroids
 	{
+
+		for(int i = 0; i < MAX_NUM_ASTEROIDS; i++){
+			game_state->asteroids[i] = nullptr;
+		}
 		for(int i = 0; i < NUM_ASTEROIDS; ++i)
 		{
-			game_state->asteroids[i] = nullptr;
 			E01_Entity* asteroid_curr = new E01_Entity();
-
-		    
 			asteroid_curr->position.x = params->entity_size_world + SDL_randf() * (context->window_w - params->entity_size_world * 2);
 			asteroid_curr->position.y = -params->entity_size_world; // spawn asteroids off screen (almost)
 			asteroid_curr->size       = params->entity_size_world + SDL_randf() * (params->entity_size_world * 4);
@@ -425,7 +427,7 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 					projectile->position.x + projectile->size * 0.5f,
 					projectile->position.y + projectile->size * 0.5f
 				};
-				for (size_t j = 0; j < NUM_ASTEROIDS; ++j)
+				for (size_t j = 0; j < MAX_NUM_ASTEROIDS; ++j)
 				{
 					if(game_state->asteroids[j] != nullptr){
 						E01_Entity* asteroid_curr = game_state->asteroids[j];
@@ -438,6 +440,43 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 						float distance_sq = distance_between_sq(asteroid_center, projectile_center);
 						if(distance_sq < asteroid_curr->collision_radius_squared){
 							deleted = true;
+							// Create more asteroid if large enough
+							if (asteroid_curr->size > params->entity_size_world * 3){
+								// 3 creations
+								for(int l = 0; l < 3; l++)
+								{
+									// add to free array index
+									for (int z = 0; z < MAX_NUM_ASTEROIDS; ++z){
+										// if free
+										if (game_state->asteroids[z] == nullptr){
+											E01_Entity* new_asteroid_curr = new E01_Entity();										
+											new_asteroid_curr->position.x = asteroid_curr->position.x + (l * params->entity_size_world);
+											new_asteroid_curr->position.y = asteroid_curr->position.y - SDL_randf() * params->entity_size_world; // spawn asteroids off screen (almost)
+											new_asteroid_curr->size       = params->entity_size_world;
+											new_asteroid_curr->collision_radius_squared = (new_asteroid_curr->size * 0.4) * (new_asteroid_curr->size * 0.4);
+											new_asteroid_curr->velocity   = params->asteroid_speed_min;
+											new_asteroid_curr->texture_atlas = game_state->texture_atlas;
+											
+											new_asteroid_curr->rotation_speed = params->asteroid_rotation_speed_min + SDL_randf() * params->asteroid_rotation_speed_range;
+
+											new_asteroid_curr->rect.w = new_asteroid_curr->size;
+											new_asteroid_curr->rect.h = new_asteroid_curr->size;
+
+											new_asteroid_curr->texture_rect.w = params->entity_size_texture;
+											new_asteroid_curr->texture_rect.h = params->entity_size_texture;
+
+											new_asteroid_curr->texture_rect.x = params->entity_size_texture * params->asteroid_sprite_coords_x;
+											new_asteroid_curr->texture_rect.y = params->entity_size_texture * params->asteroid_sprite_coords_y;
+										
+											game_state->asteroids[z] = new_asteroid_curr;
+											// go out of loop once created
+											break;
+										}
+										
+									}
+								}
+							}
+
 							delete asteroid_curr;
 							game_state->asteroids[j] = nullptr;
 							break;
@@ -473,7 +512,7 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 			game_state->player.position.x + game_state->player.size * 0.5f,
 			game_state->player.position.y + game_state->player.size * 0.5f};
 
-		for(int i = 0; i < NUM_ASTEROIDS; ++i)
+		for(int i = 0; i < MAX_NUM_ASTEROIDS; ++i)
 		{
 			if (game_state->asteroids[i] != nullptr){
 				E01_Entity* asteroid_curr = game_state->asteroids[i];
