@@ -58,6 +58,7 @@ struct E01_Entity
 	SDL_FPoint   position;
 	float        size;
 	float		 collision_radius_squared;
+	float		 warning_radius_squared;
 	float        velocity;
 	float		 rotation_speed = 0;
 	float		 rotation_value = 0;
@@ -83,6 +84,8 @@ struct E01_DesignParams
 	float asteroid_speed_range = entity_size_world * 4;
 	float asteroid_rotation_speed_min   = -2;
 	float asteroid_rotation_speed_range = 4;
+	float collision_radius_mod = 0.4;
+	float warning_radius_mod = 80;
 	int   asteroid_sprite_coords_x = 0;
 	int   asteroid_sprite_coords_y = 4;
 
@@ -329,7 +332,12 @@ static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameS
 			asteroid_curr->position.x = params->entity_size_world + SDL_randf() * (context->window_w - params->entity_size_world * 2);
 			asteroid_curr->size       = params->entity_size_world + SDL_randf() * (params->entity_size_world * 2);
 			asteroid_curr->position.y = -asteroid_curr->size; // spawn asteroids off screen (almost)
-			asteroid_curr->collision_radius_squared = (asteroid_curr->size * 0.4) * (asteroid_curr->size * 0.4);
+			asteroid_curr->collision_radius_squared = (asteroid_curr->size * params->collision_radius_mod) * (asteroid_curr->size * params->collision_radius_mod);
+			asteroid_curr->warning_radius_squared = 
+				(asteroid_curr->size * params->collision_radius_mod + params->warning_radius_mod) * 
+				(asteroid_curr->size * params->collision_radius_mod + params->warning_radius_mod);
+			
+			
 			asteroid_curr->velocity   = params->asteroid_speed_min + SDL_randf() * params->asteroid_speed_range;
 			asteroid_curr->texture_atlas = game_state->texture_atlas;
 			
@@ -453,7 +461,11 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 											new_asteroid_curr->position.x = asteroid_curr->position.x + (l * params->entity_size_world);
 											new_asteroid_curr->position.y = asteroid_curr->position.y - SDL_randf() * params->entity_size_world; // spawn asteroids off screen (almost)
 											new_asteroid_curr->size       = params->entity_size_world;
-											new_asteroid_curr->collision_radius_squared = (new_asteroid_curr->size * 0.4) * (new_asteroid_curr->size * 0.4);
+											new_asteroid_curr->collision_radius_squared = (new_asteroid_curr->size * params->collision_radius_mod) * (new_asteroid_curr->size * params->collision_radius_mod);
+											new_asteroid_curr->warning_radius_squared = 
+												(new_asteroid_curr->size * params->collision_radius_mod + params->warning_radius_mod) * 
+												(new_asteroid_curr->size * params->collision_radius_mod + params->warning_radius_mod);
+			
 											new_asteroid_curr->velocity   = params->asteroid_speed_min;
 											new_asteroid_curr->texture_atlas = game_state->texture_atlas;
 											
@@ -535,7 +547,7 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 					SDL_SetTextureColorMod(asteroid_curr->texture_atlas, 0xFF, 0x00, 0x00);
 					game_state->reset = true;
 				}
-				else if(distance_sq < warning_distance_sq)
+				else if(distance_sq < asteroid_curr->warning_radius_squared)
 					SDL_SetTextureColorMod(asteroid_curr->texture_atlas, 0xCC, 0xCC, 0x00);
 				else
 					SDL_SetTextureColorMod(asteroid_curr->texture_atlas, 0xFF, 0xFF, 0xFF); // white
