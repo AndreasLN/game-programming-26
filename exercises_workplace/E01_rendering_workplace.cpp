@@ -56,6 +56,7 @@ struct E01_Entity
 {
 	SDL_FPoint   position;
 	float        size;
+	float		 collision_radius_squared;
 	float        velocity;
 	float		 rotation_speed = 0;
 	float		 rotation_value = 0;
@@ -322,9 +323,11 @@ static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameS
 			game_state->asteroids[i] = nullptr;
 			E01_Entity* asteroid_curr = new E01_Entity();
 
+		    
 			asteroid_curr->position.x = params->entity_size_world + SDL_randf() * (context->window_w - params->entity_size_world * 2);
 			asteroid_curr->position.y = -params->entity_size_world; // spawn asteroids off screen (almost)
-			asteroid_curr->size       = params->entity_size_world;
+			asteroid_curr->size       = params->entity_size_world + SDL_randf() * (params->entity_size_world * 4);
+			asteroid_curr->collision_radius_squared = (asteroid_curr->size * 0.4) * (asteroid_curr->size * 0.4);
 			asteroid_curr->velocity   = params->asteroid_speed_min + SDL_randf() * params->asteroid_speed_range;
 			asteroid_curr->texture_atlas = game_state->texture_atlas;
 			
@@ -454,7 +457,11 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 
 		// how close an asteroid must be before triggering a collision (64 pixels. We square it because we can avoid doing the square root later)
 		// the number 64 is obtained by summing togheter the "radii" of the sprites
-		const float collision_distance_sq = 48*48;
+		const float collision_distance_sq = 32*32;
+
+		SDL_FPoint player_center = {
+			game_state->player.position.x + game_state->player.size * 0.5f,
+			game_state->player.position.y + game_state->player.size * 0.5f};
 
 		for(int i = 0; i < NUM_ASTEROIDS; ++i)
 		{
@@ -465,10 +472,12 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 				asteroid_curr->rect.x = asteroid_curr->position.x;
 				asteroid_curr->rect.y = asteroid_curr->position.y;
 
-				
+				SDL_FPoint center = {
+					asteroid_curr->position.x + asteroid_curr->size * 0.5f,
+					asteroid_curr->position.y + asteroid_curr->size * 0.5f};
 
-				float distance_sq = distance_between_sq(asteroid_curr->position, game_state->player.position);
-				if(distance_sq < collision_distance_sq){
+				float distance_sq = distance_between_sq(center, player_center);
+				if(distance_sq < asteroid_curr->collision_radius_squared){
 					SDL_SetTextureColorMod(asteroid_curr->texture_atlas, 0xFF, 0x00, 0x00);
 					game_state->reset = true;
 				}
@@ -477,7 +486,7 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 				else
 					SDL_SetTextureColorMod(asteroid_curr->texture_atlas, 0xFF, 0xFF, 0xFF); // white
 
-				asteroid_curr->rotation_value = asteroid_curr->rotation_value + asteroid_curr->rotation_speed;
+				asteroid_curr->rotation_value += asteroid_curr->rotation_speed;
 				SDL_RenderTextureRotated(
 					context->renderer, 
 					asteroid_curr->texture_atlas,
