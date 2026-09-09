@@ -1,4 +1,3 @@
-#include "SDL3/SDL_init.h"
 #define STB_IMAGE_IMPLEMENTATION
 
 #define ENABLE_DIAGNOSTICS
@@ -111,11 +110,11 @@ int main(void)
 
 	bool quit = false;
 
-	SDL_Time walltime_frame_beg;
-	SDL_Time walltime_work_end;
-	SDL_Time walltime_frame_end;
-	SDL_Time time_elapsed_frame;
-	SDL_Time time_elapsed_work;
+	SDL_Time walltime_frame_beg = 0;
+	SDL_Time walltime_frame_end = 0;
+	SDL_Time walltime_work_end  = 0;
+	SDL_Time time_elapsed_work       = 0;
+	SDL_Time time_elapsed_frame      = 0;
 
 	init(&context, &design_params, &game_state);
 
@@ -151,19 +150,6 @@ int main(void)
 
 		update(&context, &design_params, &game_state);
 
-		SDL_GetCurrentTime(&walltime_work_end);
-		time_elapsed_work = walltime_work_end - walltime_frame_beg;
-
-		if(target_framerate > time_elapsed_work)
-		{
-			SDL_DelayPrecise(target_framerate - time_elapsed_work);
-		}
-
-		SDL_GetCurrentTime(&walltime_frame_end);
-		time_elapsed_frame = walltime_frame_end - walltime_frame_beg;
-
-		context.delta = NS_TO_SECONDS(time_elapsed_frame);
-
 #ifdef ENABLE_DIAGNOSTICS
 		{
 			// draw semi-transparent background
@@ -180,12 +166,23 @@ int main(void)
 
 		// render
 		SDL_RenderPresent(context.renderer);
+		
+		SDL_GetCurrentTime(&walltime_work_end);
+		time_elapsed_work = walltime_work_end - walltime_frame_beg;
+
+		if(target_framerate > time_elapsed_work)
+		{
+			SDL_DelayPrecise(target_framerate - time_elapsed_work);
+		}
+
+		SDL_GetCurrentTime(&walltime_frame_end);
+		time_elapsed_frame = walltime_frame_end - walltime_frame_beg;
+
+		context.delta = NS_TO_SECONDS(time_elapsed_frame);
 
 		walltime_frame_beg = walltime_frame_end;
 	}
 
-	SDL_Quit();
-	
 	return 0;
 };
 
