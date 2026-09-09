@@ -13,8 +13,8 @@
 // frame rate
 const SDL_Time TARGET_FRAMERATE = SECONDS(1) / 60;
 // window size
-const int WINDOW_W = 800;
-const int WINDOW_H = 600;
+const int WINDOW_W = 1200;
+const int WINDOW_H = 1000;
 
 // amount of objects
 const int ENTITY_COUNT   = 4096;
