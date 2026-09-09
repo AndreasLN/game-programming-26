@@ -17,7 +17,7 @@ const int WINDOW_W = 800;
 const int WINDOW_H = 600;
 
 // amount of objects
-const int ENTITY_COUNT   = 128;
+const int ENTITY_COUNT   = 4096;
 const int MAX_COLLISIONS = 1024; // num max collisions per frame
 
 bool DEBUG_separate_collisions   = true;
@@ -99,7 +99,7 @@ static void sprite_render(E02_SDLContext* context, vec2f position, vec2f size, E
 	dst_rect.x = position.x - dst_rect.w * sprite->pivot.x;
 	dst_rect.y = position.y - dst_rect.h * sprite->pivot.y;
 		
-	
+
 	SDL_SetTextureColorModFloat(sprite->texture, sprite->tint.r, sprite->tint.g, sprite->tint.b);
 	SDL_SetTextureAlphaModFloat(sprite->texture, sprite->tint.a);
 	SDL_RenderTexture(context->renderer, sprite->texture, &sprite->rect, &dst_rect);
@@ -120,8 +120,9 @@ struct E02_Entity
 	vec2f position;
 	vec2f size;
 
-	E02_Sprite sprite;
 
+	E02_Sprite sprite;
+	bool is_static;
 	// collider info
 	float collider_radius;
 	vec2f collider_offset;
@@ -168,7 +169,11 @@ static void collision_check(E02_GameState* state)
 	state->frame_collisions_count = 0;
 	for(int i = 0; i < state->entities_alive_count - 1; ++i)
 	{
+		
 		E02_Entity* e1 = &state->entities[i];
+		if (e1->is_static){
+			continue;
+		}
 		
 		for(int j = i + 1; j < state->entities_alive_count; ++j)
 		{
@@ -205,13 +210,25 @@ static void collision_check(E02_GameState* state)
 
 static void collision_separate(E02_GameState* state)
 {
+	vec2f sep;
 	for(int i = 0; i < state->frame_collisions_count; ++i)
 	{
 		E02_EntityCollisionInfo entity_collision_info = state->frame_collisions[i];
+		if(entity_collision_info.e1->is_static || entity_collision_info.e2->is_static){
+			sep = entity_collision_info.normal * entity_collision_info.separation;
+		}
+		else{
+			sep = entity_collision_info.normal * entity_collision_info.separation / 2;
+		}
+		//vec2f sep = entity_collision_info.normal * entity_collision_info.separation / 2;
 
-		vec2f sep = entity_collision_info.normal * entity_collision_info.separation / 2;
-		entity_collision_info.e1->position -= sep;
-		entity_collision_info.e2->position += sep;
+		if(!entity_collision_info.e1->is_static){
+			entity_collision_info.e1->position -= sep;
+		}
+		if(!entity_collision_info.e2->is_static){
+			entity_collision_info.e2->position += sep;
+		}
+
 	}
 }
 
@@ -252,10 +269,11 @@ static void game_reset(E02_SDLContext* context, E02_GameState* state)
 	player->sprite.tint = COLOR_WHITE;
 	player->sprite.pivot = vec2f{ 0.5f, 0.5f };
 	player->collider_radius = 16;
+	player->is_static = false;
 	state->player = player;
 
 	// grid pattern
-	for(int i = 0; i < 9; ++i)
+	for(int i = 0; i < ENTITY_COUNT - 10; ++i)
 	{
 		E02_Entity* entity = entity_create(state);
 		if(!entity)
@@ -271,6 +289,7 @@ static void game_reset(E02_SDLContext* context, E02_GameState* state)
 		entity->sprite.rect = SDL_FRect{ 0, 4*128, 128, 128 };
 		entity->sprite.tint = COLOR_WHITE,
 		entity->sprite.pivot = vec2f{ 0.5f, 0.5f };
+		entity->is_static = true;
 		entity->collider_radius = 32;
 	}
 }
