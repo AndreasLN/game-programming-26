@@ -261,7 +261,7 @@ static void game_reset(E02_SDLContext* context, E02_GameState* state)
 	E02_Entity* player = entity_create(state);
 	// we always have a player. This should also always be the first entity created, so it should never fail
 	SDL_assert(player);
-	player->position.x = (float)context->window_w / 2;
+	player->position.x = (float)context->window_w - 20;
 	player->position.y = (float)context->window_h / 2;
 	player->size = vec2f{ 64, 64 };
 	player->sprite.texture = state->atlas;
@@ -282,15 +282,15 @@ static void game_reset(E02_SDLContext* context, E02_GameState* state)
 			break;
 		}
 		
-		vec2f coords = vec2f{ 1.5f + i % 3, 1.5f + i / 3};
-		entity->size = vec2f{ 64, 64 };
+		vec2f coords = vec2f{ 1.5f + i % 64, 1.5f + i / 64};
+		entity->size = vec2f{ 12, 12 };
 		entity->position = mul_element_wise(entity->size,  coords);
 		entity->sprite.texture = state->atlas;
 		entity->sprite.rect = SDL_FRect{ 0, 4*128, 128, 128 };
 		entity->sprite.tint = COLOR_WHITE,
 		entity->sprite.pivot = vec2f{ 0.5f, 0.5f };
 		entity->is_static = true;
-		entity->collider_radius = 32;
+		entity->collider_radius = 6;
 	}
 }
 
