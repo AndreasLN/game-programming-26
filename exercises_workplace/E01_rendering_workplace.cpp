@@ -329,7 +329,7 @@ static void init(E01_EngineContext* context, E01_DesignParams* params, E01_GameS
 		for(int i = 0; i < NUM_ASTEROIDS; ++i)
 		{
 			E01_Entity* asteroid_curr = new E01_Entity();
-			asteroid_curr->position.x = params->entity_size_world + SDL_randf() * (context->window_w - params->entity_size_world * 2);
+			asteroid_curr->position.x = params->entity_size_world + SDL_randf() * (context->window_w - params->entity_size_world * 3);
 			asteroid_curr->size       = params->entity_size_world + SDL_randf() * (params->entity_size_world * 2);
 			asteroid_curr->position.y = -asteroid_curr->size; // spawn asteroids off screen (almost)
 			asteroid_curr->collision_radius_squared = (asteroid_curr->size * params->collision_radius_mod) * (asteroid_curr->size * params->collision_radius_mod);
@@ -461,6 +461,10 @@ static void update(E01_EngineContext* context, E01_DesignParams* params, E01_Gam
 											new_asteroid_curr->position.x = asteroid_curr->position.x + (l * params->entity_size_world);
 											new_asteroid_curr->position.y = asteroid_curr->position.y - SDL_randf() * params->entity_size_world; // spawn asteroids off screen (almost)
 											new_asteroid_curr->size       = params->entity_size_world;
+											if(new_asteroid_curr->position.x + new_asteroid_curr->size > window_w){
+												new_asteroid_curr->position.x = new_asteroid_curr->position.x - window_w + new_asteroid_curr->size;
+											}
+											
 											new_asteroid_curr->collision_radius_squared = (new_asteroid_curr->size * params->collision_radius_mod) * (new_asteroid_curr->size * params->collision_radius_mod);
 											new_asteroid_curr->warning_radius_squared = 
 												(new_asteroid_curr->size * params->collision_radius_mod + params->warning_radius_mod) * 
