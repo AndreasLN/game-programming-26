@@ -14,7 +14,7 @@
 const SDL_Time TARGET_FRAMERATE = SECONDS(1) / 60;
 // window size
 const int WINDOW_W = 1200;
-const int WINDOW_H = 1000;
+const int WINDOW_H = 800;
 
 // amount of objects
 const int ENTITY_COUNT   = 4096;
@@ -164,6 +164,7 @@ struct E02_EntityCollisionInfo
 	float separation;
 };
 
+
 static void collision_check(E02_GameState* state)
 {
 	state->frame_collisions_count = 0;
@@ -229,6 +230,25 @@ static void collision_separate(E02_GameState* state)
 			entity_collision_info.e2->position += sep;
 		}
 
+	}
+}
+
+static void clamp(E02_GameState* state){
+	for (int i = 0; i < state->entities_alive_count; ++i){
+		E02_Entity * entity = &state->entities[i];
+
+		if(entity->position.x + entity->collider_offset.x + entity->collider_radius > WINDOW_W){
+			entity->position.x = WINDOW_W - entity->collider_offset.x - entity->collider_radius;
+		}
+		if(entity->position.x + entity->collider_offset.x - entity->collider_radius < 0){
+			entity->position.x = entity->collider_radius;
+		}
+		if(entity->position.y + entity->collider_offset.y - entity->collider_radius < 0){
+			entity->position.y = entity->collider_radius;
+		}
+		if(entity->position.y + entity->collider_offset.y + entity->collider_radius > WINDOW_H){
+			entity->position.y = WINDOW_H - entity->collider_offset.y - entity->collider_radius;
+		}
 	}
 }
 
@@ -319,6 +339,9 @@ static void game_update(E02_SDLContext* context, E02_GameState* state)
 	collision_check(state);
 	if(DEBUG_separate_collisions)
 		collision_separate(state);
+	
+
+	clamp(state);
 }
 
 static void game_render(E02_SDLContext* context, E02_GameState* state)
