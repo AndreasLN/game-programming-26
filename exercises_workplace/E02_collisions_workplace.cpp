@@ -3,6 +3,8 @@
 
 #define ENABLE_DIAGNOSTICS
 
+
+
 #include <SDL3/SDL.h>
 #include <stb_image.h>
 
@@ -18,6 +20,12 @@ const int WINDOW_H = 800;
 
 // amount of objects
 const int ENTITY_COUNT   = 4096;
+const int CELLS			 = 4;
+
+// better grammer for getting stuff from 2d array
+#define idx(i,j) (j + i*ENTITY_COUNT)
+
+
 const int MAX_COLLISIONS = 1024; // num max collisions per frame
 
 bool DEBUG_separate_collisions   = true;
@@ -136,7 +144,7 @@ static E02_Entity* entity_create(E02_GameState* state)
 	// // concise version
 	//return &state->entities[state->entities_alive_count++];
 
-	E02_Entity* ret = &state->entities[state->entities_alive_count];
+	E02_Entity* ret = &state->entities[idx(0, state->entities_alive_count)];
 	++state->entities_alive_count;
 
 	return ret;
@@ -149,7 +157,7 @@ static void entity_destroy(E02_GameState* state, E02_Entity* entity)
 	SDL_assert(entity < state->entities || entity > state->entities + ENTITY_COUNT);
 
 	--state->entities_alive_count;
-	*entity = state->entities[state->entities_alive_count];
+	*entity = state->entities[idx(0, state->entities_alive_count)];
 }
 // =====================================================================================================================
 // collisions
@@ -171,14 +179,14 @@ static void collision_check(E02_GameState* state)
 	for(int i = 0; i < state->entities_alive_count - 1; ++i)
 	{
 		
-		E02_Entity* e1 = &state->entities[i];
+		E02_Entity* e1 = &state->entities[idx(0, i)];
 		if (e1->is_static){
 			continue;
 		}
 		
 		for(int j = i + 1; j < state->entities_alive_count; ++j)
 		{
-			E02_Entity* e2 = &state->entities[j];
+			E02_Entity* e2 = &state->entities[idx(0,j)];
 
 			if(itu_lib_overlaps_circle_circle(
 				e1->position + e1->collider_offset, e1->collider_radius,
@@ -235,7 +243,7 @@ static void collision_separate(E02_GameState* state)
 
 static void clamp(E02_GameState* state){
 	for (int i = 0; i < state->entities_alive_count; ++i){
-		E02_Entity * entity = &state->entities[i];
+		E02_Entity * entity = &state->entities[idx(0,i)];
 
 		if(entity->position.x + entity->collider_offset.x + entity->collider_radius > WINDOW_W){
 			entity->position.x = WINDOW_W - entity->collider_offset.x - entity->collider_radius;
@@ -260,7 +268,7 @@ static void game_init(E02_SDLContext* context, E02_GameState* state)
 {
 	// contiguous memory
 	{
-		state->entities = (E02_Entity*)SDL_malloc(ENTITY_COUNT * sizeof(E02_Entity));
+		state->entities = (E02_Entity*)SDL_malloc(ENTITY_COUNT * CELLS * sizeof(E02_Entity));
 		SDL_assert(state->entities);
 
 		state->frame_collisions = (E02_EntityCollisionInfo*)SDL_malloc(MAX_COLLISIONS * sizeof(E02_EntityCollisionInfo));
@@ -295,6 +303,7 @@ static void game_reset(E02_SDLContext* context, E02_GameState* state)
 	// grid pattern
 	for(int i = 0; i < ENTITY_COUNT - 10; ++i)
 	{
+		
 		E02_Entity* entity = entity_create(state);
 		if(!entity)
 		{
@@ -332,7 +341,7 @@ static void game_update(E02_SDLContext* context, E02_GameState* state)
 	// reset tint
 	for(int i = 0; i < state->entities_alive_count; ++i)
 	{
-		E02_Entity* entity = &state->entities[i];
+		E02_Entity* entity = &state->entities[idx(0, i)];
 		entity->sprite.tint = COLOR_WHITE;
 	}
 
@@ -349,7 +358,7 @@ static void game_render(E02_SDLContext* context, E02_GameState* state)
 	// render
 	for(int i = 0; i < state->entities_alive_count; ++i)
 	{
-		E02_Entity* entity = &state->entities[i];
+		E02_Entity* entity = &state->entities[idx(0, i)];
 		sprite_render(context, entity->position, entity->size, &entity->sprite);
 
 		if(DEBUG_render_colliders)
