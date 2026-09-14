@@ -8,9 +8,17 @@
 #include <SDL3/SDL.h>
 #include <stb_image.h>
 
+
 #include <itu_common.hpp>
 #include <itu_lib_render_screen.hpp>
 #include <itu_lib_overlaps.hpp>
+
+using namespace std;
+#include <list>
+
+using namespace std;
+#include <string>
+
 
 // frame rate
 const SDL_Time TARGET_FRAMERATE = SECONDS(1) / 60;
@@ -19,7 +27,7 @@ const int WINDOW_W = 1200;
 const int WINDOW_H = 800;
 
 // amount of objects
-const int ENTITY_COUNT   = 4096;
+const int ENTITY_COUNT   = 4026;
 const int CELLS			 = 4;
 const int split			 = sqrt(CELLS);
 const int split_w		 = WINDOW_W / split;
@@ -56,14 +64,19 @@ struct E02_SDLContext
 	bool btn_isdown_space;
 };
 
+#include <list>
+
+
+
 struct E02_entitygrid
 {
-	E02_Entity* entities;
+	list<E02_Entity*> entities;
 	int entities_alive_count;
 	int x_start;
 	int x_end;
 	int y_start;
 	int y_end;
+	int id;
 
 };
 
@@ -72,8 +85,8 @@ struct E02_GameState
 	E02_Entity* player;
 
 	// game-allocated memory
-	E02_entitygrid* entity_grids;
-	E02_Entity* entities;
+	list<E02_entitygrid*> entity_grids;
+	//E02_Entity* entities;
 	//int entities_alive_count;
 
 	E02_EntityCollisionInfo* frame_collisions;
@@ -154,32 +167,31 @@ struct E02_Entity
 
 bool inRange(unsigned x_low, unsigned x_high, unsigned x, unsigned y_low, unsigned y_high, unsigned y)
 {
-	//SDL_Log("%i < %i < %i. %i < %i < %i", x_low, x, x_high, y_low, y, y_high);
     return  ((x-x_low) < (x_high-x_low) && (y-y_low) < (y_high-y_low));
 }
 
-static E02_Entity* entity_create(E02_GameState* state, vec2f start_pos, vec2f size)
+static void entity_create(E02_GameState* state, vec2f * start_pos, vec2f * size, E02_Entity * entity)
 {
-	E02_Entity* ret = NULL;
 	E02_entitygrid * cur_grid;
 	int cur_alive;
-	for (int i = 0; i < CELLS; i++)
+
+	for (E02_entitygrid * cur_grid : state->entity_grids)
 	{
-		cur_grid = &state->entity_grids[i];
-		if(inRange(cur_grid->x_start, cur_grid->x_end, start_pos.x, cur_grid->y_start, cur_grid->y_end, start_pos.y))
+		if(inRange(cur_grid->x_start, cur_grid->x_end, start_pos->x, cur_grid->y_start, cur_grid->y_end, start_pos->y))
 		{
-			//SDL_Log("!!!!!!%i < %f < %i. %i < %f < %i", cur_grid->x_start, start_pos.x, cur_grid->x_end, cur_grid->y_start, start_pos.y, cur_grid->y_end);
-			cur_alive = state->entity_grids[i].entities_alive_count;
+			cur_alive = cur_grid->entities_alive_count;
 
 			if(!(cur_alive < ENTITY_COUNT))
-					return NULL;
-			
-			ret = &state->entity_grids[i].entities[cur_alive];
-			++state->entity_grids[i].entities_alive_count;
+					return;
+			if(entity->is_static){
+				cur_grid->entities.push_back(entity);
+			}
+			else{
+				cur_grid->entities.push_front(entity);
+			}
+			++cur_grid->entities_alive_count;
 		}
 	}
-
-	return ret;
 }
 
 
@@ -187,18 +199,14 @@ static E02_Entity* entity_create(E02_GameState* state, vec2f start_pos, vec2f si
 static void entity_destroy(E02_GameState* state, E02_Entity* entity, vec2f pos, vec2f size)
 {
 	E02_entitygrid * cur_grid;
-	int cur_alive;
-	for (int i = 0; i < CELLS; i++)
+	for(E02_entitygrid * cur_grid : state->entity_grids)
 	{
-		cur_grid = &state->entity_grids[i];
 		if(inRange(cur_grid->x_start, cur_grid->x_end, pos.x, cur_grid->y_start, cur_grid->y_end, pos.y))
 		{
-			SDL_Log("%i, DESTROY", cur_alive);
-			SDL_Log("!!!!!!%i < %f < %i. %i < %f < %i", cur_grid->x_start, pos.x, cur_grid->x_end, cur_grid->y_start, pos.y, cur_grid->y_end);
-			cur_alive = state->entity_grids[i].entities_alive_count;
 			
-			--state->entity_grids[i].entities_alive_count;
-			*entity = state->entity_grids[i].entities[state->entity_grids[i].entities_alive_count];
+			cur_grid->entities.remove(entity);
+			SDL_Log("YAYAYAYYAYA");
+			--cur_grid->entities_alive_count;
 		}
 	}
 	// NOTE: here we want to fail hard, nobody should pass us a pointer not gotten from `entity_create()`
@@ -209,7 +217,7 @@ static void entity_destroy(E02_GameState* state, E02_Entity* entity, E02_entityg
 {
 	//SDL_assert(entity < state->entities || entity > state->entities + ENTITY_COUNT);
 	--cell->entities_alive_count;
-	*entity = cell->entities[cell->entities_alive_count];	
+	cell->entities.remove(entity);
 }
 
 
@@ -217,27 +225,24 @@ static void entity_move(E02_GameState* state, E02_Entity * entity, vec2f new_pos
 {
 	E02_Entity new_entity = { 0 };
 	E02_Entity * new_entity_ptr = &new_entity;
-	E02_entitygrid * cur_grid;
 	int cur_alive;
-	for (int i = 0; i < CELLS; i++)
+	for (E02_entitygrid * cur_grid : state->entity_grids)
 	{
-		cur_grid = &state->entity_grids[i];
+
 		if(inRange(cur_grid->x_start, cur_grid->x_end, new_pos.x, cur_grid->y_start, cur_grid->y_end, new_pos.y))
 		{
-			SDL_Log("!!!!!!%i < %f < %i. %i < %f < %i", cur_grid->x_start, new_pos.x, cur_grid->x_end, cur_grid->y_start, new_pos.y, cur_grid->y_end);
-			cur_alive = state->entity_grids[i].entities_alive_count;
-			//SDL_Log("AAAAHHHHHHH");
+			cur_alive = cur_grid->entities_alive_count;
 
 			if(!(cur_alive < ENTITY_COUNT))
 					return;
-
-			memcpy(&state->entity_grids[i].entities[cur_alive], entity, sizeof(E02_Entity));
-			//state->entity_grids[i].entities[cur_alive] = *new_entity_ptr;
-			if (entity == state->player){
-				state->player = &state->entity_grids[i].entities[cur_alive];
-				entity_destroy(state, entity, entity->position, entity->size);
+			if(entity->is_static){
+				cur_grid->entities.push_back(entity);
 			}
-			++state->entity_grids[i].entities_alive_count;
+			else{
+				cur_grid->entities.push_front(entity);
+			}
+			entity_destroy(state, entity, entity->position, entity->size);
+			++cur_grid->entities_alive_count;
 		}
 	}
 	// // concise version
@@ -266,22 +271,25 @@ struct E02_EntityCollisionInfo
 
 static void collision_check(E02_GameState* state)
 {
-	E02_entitygrid * cur_grid;
 	state->frame_collisions_count = 0;
-	for(int grid_count = 0; grid_count < CELLS; ++grid_count){
-		cur_grid = &state->entity_grids[grid_count];
-
-		for(int i = 0; i < cur_grid->entities_alive_count - 1; ++i)
+	for (E02_entitygrid * cur_grid : state->entity_grids)
+	{
+		list<E02_Entity*> entities_copy(cur_grid->entities);
+		for(E02_Entity * e1 : cur_grid->entities)
 		{
-		
-			E02_Entity* e1 = &cur_grid->entities[i];
+			if (cur_grid->entities.back() == e1){
+				break;
+			}
 			if (e1->is_static){
 				continue;
 			}
+			entities_copy.pop_front();
+		
 			
-			for(int j = i + 1; j < cur_grid->entities_alive_count; ++j)
+			
+			for(E02_Entity * e2 : entities_copy)
 			{
-				E02_Entity* e2 = &cur_grid->entities[j];
+				
 
 				if(itu_lib_overlaps_circle_circle(
 					e1->position + e1->collider_offset, e1->collider_radius,
@@ -293,7 +301,7 @@ static void collision_check(E02_GameState* state)
 
 					if(state->frame_collisions_count >= MAX_COLLISIONS)
 					{
-						SDL_Log("[WARNING] too many collisions!");
+						SDL_Log("[WARNING] too many collisions!, %i", state->frame_collisions_count);
 						return;
 					}
 
@@ -341,13 +349,11 @@ static void collision_separate(E02_GameState* state)
 }
 
 static void clamp(E02_GameState* state){
-	E02_entitygrid* cur_grid;
-	for (int grid_count = 0; grid_count < CELLS; ++grid_count){
-		cur_grid = &state->entity_grids[grid_count];
 
-		for (int i = 0; i < cur_grid->entities_alive_count; ++i){
-				E02_Entity * entity = &cur_grid->entities[i];
-
+	for (E02_entitygrid * cur_grid : state->entity_grids)
+	{
+		for (E02_Entity * entity : cur_grid->entities)
+		{
 				if(entity->position.x + entity->collider_offset.x + entity->collider_radius > WINDOW_W){
 					entity->position.x = WINDOW_W - entity->collider_offset.x - entity->collider_radius;
 				}
@@ -375,19 +381,17 @@ static void game_init(E02_SDLContext* context, E02_GameState* state)
 	{
 		//state->entities = (E02_Entity*)SDL_malloc(CELLS * sizeof(E02_Entity));
 		
-		state->entity_grids = (E02_entitygrid*)SDL_malloc(CELLS * sizeof(E02_entitygrid));
-		SDL_assert(state->entity_grids);
+		state->entity_grids = { };
+		//SDL_assert(state->entity_grids);
 
 		// setup grids
 		int split = sqrt(CELLS);
 		for(int i = 0; i < split; ++i)
 		{
 			for(int j = 0; j < split; ++j){
-
-				E02_entitygrid init_grid = { 0 };
-				E02_entitygrid * grid = &state->entity_grids[idx(i,j, split)];
-				grid->entities = (E02_Entity*)SDL_malloc(ENTITY_COUNT * sizeof(E02_Entity));
-				SDL_assert(grid->entities);
+				E02_entitygrid * grid = new E02_entitygrid();
+				grid->entities = { };
+				//SDL_assert(grid->entities);
 				grid->entities_alive_count = 0;
 				
 				grid->x_start = i * (WINDOW_W / split);
@@ -396,13 +400,12 @@ static void game_init(E02_SDLContext* context, E02_GameState* state)
 				grid->y_start = j * (WINDOW_H / split);
 				grid->y_end = grid->y_start + WINDOW_H / split;
 
-				//SDL_Log("x_start: %i, y_start: %i", state->entity_grids[idx(i,j,split)].x_start,state->entity_grids[idx(i,j,split)].y_start);
-				//SDL_Log("x_end: %i, y_end: %i", state->entity_grids[idx(i,j,split)].x_end,state->entity_grids[idx(i,j,split)].y_end);
+				grid->id = idx(i, j, split);
+
+				state->entity_grids.push_back(grid);
+
 			}
 		}		
-
-		//SDL_Log("!!!!!x_start: %i, y_start: %i", state->entity_grids[0].x_start,state->entity_grids[0].y_start);
-		//SDL_Log("!!!!!x_end: %i, y_end: %i", state->entity_grids[0].x_end,state->entity_grids[0].y_end);
 
 		state->frame_collisions = (E02_EntityCollisionInfo*)SDL_malloc(MAX_COLLISIONS * sizeof(E02_EntityCollisionInfo));
 		SDL_assert(state->frame_collisions);
@@ -415,11 +418,10 @@ static void game_init(E02_SDLContext* context, E02_GameState* state)
 
 static void game_reset(E02_SDLContext* context, E02_GameState* state)
 {
-	for (int i = 0; i < CELLS; ++i)
+	for (E02_entitygrid * cur_grid : state->entity_grids)
 	{
-		SDL_memset(state->entity_grids[i].entities, 0, ENTITY_COUNT * sizeof(E02_Entity));
-		state->entity_grids->entities_alive_count = 0;
-
+		cur_grid->entities.clear();
+		cur_grid->entities_alive_count = 0;
 	}
 
 	//SDL_memset(state->entity_grids, 0, CELLS * sizeof(E02_entitygrid));
@@ -427,9 +429,8 @@ static void game_reset(E02_SDLContext* context, E02_GameState* state)
 	vec2f position = {(float)context->window_w - 20, (float)context->window_h / 2};
 	vec2f size = vec2f{ 64, 64 };
 	// entities
-	E02_Entity* player = entity_create(state, position, size);
+	E02_Entity * player = new E02_Entity(); 
 	// we always have a player. This should also always be the first entity created, so it should never fail
-	SDL_assert(player);
 	player->position = position;
 	player->size = size;
 	player->sprite.texture = state->atlas;
@@ -438,15 +439,17 @@ static void game_reset(E02_SDLContext* context, E02_GameState* state)
 	player->sprite.pivot = vec2f{ 0.5f, 0.5f };
 	player->collider_radius = 16;
 	player->is_static = false;
-	state->player = player;
+	
+	entity_create(state, &position, &size, player);
 
+	state->player = player;
 	// grid pattern
-	for(int i = 0; i < ENTITY_COUNT - 10; ++i)
+	for(int i = 0; i < ENTITY_COUNT - 1; ++i)
 	{
 		vec2f size = vec2f{ 12, 12 };
 		vec2f coords = vec2f{ 1.5f + i % 64, 1.5f + i / 64};
 		vec2f pos = mul_element_wise(size,  coords);
-		E02_Entity* entity = entity_create(state, pos, size);
+		E02_Entity * entity = new E02_Entity();
 		if(!entity)
 		{
 			SDL_Log("[WARNING] too many entity spawned!");
@@ -459,13 +462,16 @@ static void game_reset(E02_SDLContext* context, E02_GameState* state)
 		entity->sprite.rect = SDL_FRect{ 0, 4*128, 128, 128 };
 		entity->sprite.tint = COLOR_WHITE,
 		entity->sprite.pivot = vec2f{ 0.5f, 0.5f };
-		entity->is_static = false;
+		entity->is_static = true;
 		entity->collider_radius = 6;
+		entity_create(state, &pos, &size, entity);
 	}
+
 }
 
 static void game_update(E02_SDLContext* context, E02_GameState* state)
 {
+
 	vec2f mov = { 0 };
 	if(context->btn_isdown_up)
 		mov.y -= 1;
@@ -477,36 +483,27 @@ static void game_update(E02_SDLContext* context, E02_GameState* state)
 		mov.x += 1;
 
 	vec2f velocity = normalize(mov) * (128 * context->delta);
-	
-	//SDL_Log("%f,   %f",  floor(state->player->position.x / split_w),floor((state->player->position.x + velocity.x) / split_w) );
+
 	if(floor(state->player->position.x / split_w) != floor((state->player->position.x + velocity.x) / split_w) ||
 		floor(state->player->position.y / split_h) != floor((state->player->position.y + velocity.y) / split_h))
 		{
-			E02_Entity * old_player = state->player;
+			SDL_Log("MOVING");
 			entity_move(state, state->player, state->player->position + velocity);
-			//entity_destroy(state, old_player, state->player->position, state->player->size);
 		}	
 	
 	state->player->position = state->player->position + velocity;
-	
-
-	E02_entitygrid * cur_grid;
 	// reset tint
-	for (int grid_count = 0; grid_count < CELLS; ++grid_count)
+	for(E02_entitygrid * cur_grid : state->entity_grids)
 	{
-		cur_grid = &state->entity_grids[grid_count];
-		for(int i = 0; i < cur_grid->entities_alive_count; ++i)
+		for(E02_Entity * entity : cur_grid->entities)
 			{
-				E02_Entity* entity = &cur_grid->entities[i];
 				entity->sprite.tint = COLOR_WHITE;
 			}
-
 		/* code */
 	}
-	
-	
 
 	collision_check(state);
+
 	if(DEBUG_separate_collisions)
 		collision_separate(state);
 	
@@ -516,14 +513,11 @@ static void game_update(E02_SDLContext* context, E02_GameState* state)
 
 static void game_render(E02_SDLContext* context, E02_GameState* state)
 {
-	E02_entitygrid * cur_grid;
-	for(int grid_count = 0; grid_count < CELLS; ++grid_count){
-		cur_grid = &state->entity_grids[grid_count];
-		
+	for(E02_entitygrid * cur_grid : state->entity_grids)
+	{
 		// render
-		for(int i = 0; i < cur_grid->entities_alive_count; ++i)
+		for(E02_Entity * entity : cur_grid->entities)
 		{
-			E02_Entity* entity = &cur_grid->entities[i];
 			sprite_render(context, entity->position, entity->size, &entity->sprite);
 
 			if(DEBUG_render_colliders)
@@ -569,9 +563,7 @@ int main(void)
 		SDL_SetRenderScale(context.renderer, context.zoom, context.zoom);
 	}
 	
-	SDL_Log("INIT");
 	game_init(&context, &state);	
-	SDL_Log("RESET");
 
 	game_reset(&context, &state);
 
@@ -628,6 +620,7 @@ int main(void)
 		// update
 		game_update(&context, &state);
 		game_render(&context, &state);
+
 
 #ifdef ENABLE_DIAGNOSTICS
 		{
