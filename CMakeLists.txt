@@ -11,6 +11,7 @@ set(BUILD_SHARED_LIBS OFF)
 
 # 3rd party libraries
 add_subdirectory(lib/SDL)
+add_subdirectory(lib/imgui)
 
 # repo's executables
 add_subdirectory(examples)
