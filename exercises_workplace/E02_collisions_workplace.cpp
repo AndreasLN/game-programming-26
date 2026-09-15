@@ -185,12 +185,12 @@ struct E02_Entity
 	vec2f position;
 	vec2f size;
 
-
 	E02_Sprite sprite;
 	bool is_static;
 	// collider info
 	float collider_radius;
 	vec2f collider_offset;
+	map<E02_xy_pair, bool> cur_grids;
 };
 
 bool inRange(unsigned x_low, unsigned x_high, unsigned x, unsigned y_low, unsigned y_high, unsigned y)
@@ -419,7 +419,6 @@ static void game_init(E02_SDLContext* context, E02_GameState* state)
 				
 				grid->x_start = i * (WINDOW_W / split);
 				grid->x_end = grid->x_start + WINDOW_W / split;
-
 				
 				grid->y_start = j * (WINDOW_H / split);
 				grid->y_end = grid->y_start + WINDOW_H / split;
@@ -463,6 +462,11 @@ static void game_reset(E02_SDLContext* context, E02_GameState* state)
 	player->sprite.pivot = vec2f{ 0.5f, 0.5f };
 	player->collider_radius = 16;
 	player->is_static = false;
+	for(int i = 0; i < split; ++i){
+		for(int j = 0; j < split; ++j){
+			player->cur_grids[{i,j}] = false;
+		}
+	}
 	
 	entity_create(state, &position, &size, player);
 
@@ -488,6 +492,11 @@ static void game_reset(E02_SDLContext* context, E02_GameState* state)
 		entity->sprite.pivot = vec2f{ 0.5f, 0.5f };
 		entity->is_static = true;
 		entity->collider_radius = 6;
+		for(int i = 0; i < split; ++i){
+			for(int j = 0; j < split; ++j){
+				player->cur_grids[{i,j}] = false;
+			}
+		}
 		entity_create(state, &pos, &size, entity);
 	}
 
@@ -516,26 +525,17 @@ static void game_update(E02_SDLContext* context, E02_GameState* state)
 	vec2f a = vec2f{ left, bottom };
 	vec2f b = vec2f{ right, bottom };
 	vec2f c = vec2f{ right, top };
-	vec2f d = vec2f{ left, top };	
+	vec2f d = vec2f{ left, top };
 
 	list<vec2f*> positions = {&a,&b,&c,&d};
 	for(vec2f * position : positions){
-		for(int i = 1; i <= split; ++i)
-		{
-			if(position->x < WINDOW_W / split * i){
-				continue; // go to next x split
-			}
-			for(int j = i; j <= split; ++j) // fold horizontally, ending here means that position is within right side of split
-			{
-				if(position->y < WINDOW_W / split * j){ // is y on top
-					continue; // split further on top
-				}
-				else
-				{
-					// position is in this grid
-				}
-			}
-		}
+		int i = floor((position->x / WINDOW_W) * split);
+		int j = floor((position->y / WINDOW_H) * split);
+		
+		SDL_Log("%f, %f", floor((position->x / WINDOW_W)) * split, floor((position->y / WINDOW_H)) * split);
+		SDL_Log("%i, %i", i, j);
+
+		
 	}
 	// all grids have been found
 	// any old grid that player is no longer on remove, remove player from grid 
