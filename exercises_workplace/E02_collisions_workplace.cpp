@@ -29,8 +29,8 @@ const int WINDOW_W = 1200;
 const int WINDOW_H = 800;
 
 // amount of objects
-const int ENTITY_COUNT   = 1024;
-const int CELLS			 = 4;
+const int ENTITY_COUNT   = 1025;
+const int CELLS			 = 64;
 const int split			 = sqrt(CELLS);
 const int split_w		 = WINDOW_W / split;
 const int split_h		 = WINDOW_H / split;
@@ -40,7 +40,7 @@ const int split_h		 = WINDOW_H / split;
 #define idx(i,j, x) (j + i * x)
 
 
-const int MAX_COLLISIONS = 1024; // num max collisions per frame
+const int MAX_COLLISIONS = ENTITY_COUNT; // num max collisions per frame
 
 bool DEBUG_separate_collisions   = true;
 bool DEBUG_render_colliders      = true;
@@ -288,16 +288,13 @@ static void entity_move_to_grids(E02_GameState* state, E02_Entity * entity)
 	for(auto pair: entity->cur_grids){
 		if(pair.second == true && temp_curgrid.find(pair.first) == temp_curgrid.end()){
 			entity->cur_grids[pair.first] = false;
-			SDL_Log("MOVING ENTITY OUT FROM THIS: %i, %i", pair.first.x, pair.first.y);
 			entity_destroy(entity, state->entity_grids[{pair.first}]);
 		}
 		else if(pair.second == false && temp_curgrid.find(pair.first) != temp_curgrid.end()){
 			entity->cur_grids[pair.first] = true;
-			SDL_Log("MOVING ENTITY INTO THIS: %i, %i", pair.first.x, pair.first.y);
 			entity_create(entity, state->entity_grids[{pair.first}]);
 		}
 	}
-
 	return;
 }
 
@@ -362,10 +359,7 @@ static void collision_check(E02_GameState* state)
 				}
 			}
 		}
-
-		
 	}
-	
 }
 
 static void collision_separate(E02_GameState* state)
@@ -391,7 +385,6 @@ static void collision_separate(E02_GameState* state)
 			entity_collision_info.e2->position += sep;
 			entity_move_to_grids(state, entity_collision_info.e2);
 		}
-
 	}
 }
 
@@ -453,14 +446,11 @@ static void game_init(E02_SDLContext* context, E02_GameState* state)
 
 			}
 		}		
-
 		state->frame_collisions = (E02_EntityCollisionInfo*)SDL_malloc(MAX_COLLISIONS * sizeof(E02_EntityCollisionInfo));
 		SDL_assert(state->frame_collisions);
 	}
-
 	// texture atlasesw
 	state->atlas = texture_create(context, "data/kenney/simpleSpace_tilesheet_2.png");
-
 }
 
 static void game_reset(E02_SDLContext* context, E02_GameState* state)
@@ -541,13 +531,6 @@ static void game_update(E02_SDLContext* context, E02_GameState* state)
 		mov.x += 1;
 
 	vec2f velocity = normalize(mov) * (128 * context->delta);
-	
-	
-	// all grids have been found
-	// any old grid that player is no longer on remove, remove player from grid 
-
-	// any new grid that the player is not on add player to grid
-	
 	
 	state->player->position = state->player->position + velocity;
 	
