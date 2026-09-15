@@ -19,6 +19,8 @@ using namespace std;
 using namespace std;
 #include <string>
 
+using namespace std;
+#include <map>
 
 // frame rate
 const SDL_Time TARGET_FRAMERATE = SECONDS(1) / 60;
@@ -80,12 +82,38 @@ struct E02_entitygrid
 
 };
 
+struct E02_xy_pair
+{
+	int x;
+	int y;
+};
+
+bool operator==(const E02_xy_pair& lhs, const E02_xy_pair& rhs)
+{
+	if(lhs.x == rhs.x && lhs.y == rhs.y){
+   		 return true;
+	}
+	else{
+		return false;
+	}
+};
+
+bool operator<(const E02_xy_pair& lhs, const E02_xy_pair& rhs)
+{
+    if (lhs.x != rhs.x) {
+        return lhs.x < rhs.x;
+    } else {
+        return lhs.y < rhs.y;
+    }
+}
+
 struct E02_GameState
 {
 	E02_Entity* player;
 
 	// game-allocated memory
-	list<E02_entitygrid*> entity_grids;
+	//list<E02_entitygrid*> entity_grids;
+	map<E02_xy_pair, E02_entitygrid*> entity_grids; // map x and y (0,0) would be top right grid
 	//E02_Entity* entities;
 	//int entities_alive_count;
 
@@ -172,24 +200,24 @@ bool inRange(unsigned x_low, unsigned x_high, unsigned x, unsigned y_low, unsign
 
 static void entity_create(E02_GameState* state, vec2f * start_pos, vec2f * size, E02_Entity * entity)
 {
-	E02_entitygrid * cur_grid;
+	//E02_entitygrid * cur_grid;
 	int cur_alive;
 
-	for (E02_entitygrid * cur_grid : state->entity_grids)
+	for (auto pair : state->entity_grids)
 	{
-		if(inRange(cur_grid->x_start, cur_grid->x_end, start_pos->x, cur_grid->y_start, cur_grid->y_end, start_pos->y))
+		if(inRange(pair.second->x_start, pair.second->x_end, start_pos->x, pair.second->y_start, pair.second->y_end, start_pos->y))
 		{
-			cur_alive = cur_grid->entities_alive_count;
+			cur_alive = pair.second->entities_alive_count;
 
 			if(!(cur_alive < ENTITY_COUNT))
 					return;
 			if(entity->is_static){
-				cur_grid->entities.push_back(entity);
+				pair.second->entities.push_back(entity);
 			}
 			else{
-				cur_grid->entities.push_front(entity);
+				pair.second->entities.push_front(entity);
 			}
-			++cur_grid->entities_alive_count;
+			++pair.second->entities_alive_count;
 		}
 	}
 }
@@ -198,15 +226,13 @@ static void entity_create(E02_GameState* state, vec2f * start_pos, vec2f * size,
 // NOTE: this only works if nobody holds references to other entities!
 static void entity_destroy(E02_GameState* state, E02_Entity* entity, vec2f pos, vec2f size)
 {
-	E02_entitygrid * cur_grid;
-	for(E02_entitygrid * cur_grid : state->entity_grids)
+	for(auto pair : state->entity_grids)
 	{
-		if(inRange(cur_grid->x_start, cur_grid->x_end, pos.x, cur_grid->y_start, cur_grid->y_end, pos.y))
+		if(inRange(pair.second->x_start, pair.second->x_end, pos.x, pair.second->y_start, pair.second->y_end, pos.y))
 		{
 			
-			cur_grid->entities.remove(entity);
-			SDL_Log("YAYAYAYYAYA");
-			--cur_grid->entities_alive_count;
+			pair.second->entities.remove(entity);
+			--pair.second->entities_alive_count;
 		}
 	}
 	// NOTE: here we want to fail hard, nobody should pass us a pointer not gotten from `entity_create()`
@@ -226,23 +252,23 @@ static void entity_move(E02_GameState* state, E02_Entity * entity, vec2f new_pos
 	E02_Entity new_entity = { 0 };
 	E02_Entity * new_entity_ptr = &new_entity;
 	int cur_alive;
-	for (E02_entitygrid * cur_grid : state->entity_grids)
+	for (auto pair : state->entity_grids)
 	{
 
-		if(inRange(cur_grid->x_start, cur_grid->x_end, new_pos.x, cur_grid->y_start, cur_grid->y_end, new_pos.y))
+		if(inRange(pair.second->x_start, pair.second->x_end, new_pos.x, pair.second->y_start, pair.second->y_end, new_pos.y))
 		{
-			cur_alive = cur_grid->entities_alive_count;
+			cur_alive = pair.second->entities_alive_count;
 
 			if(!(cur_alive < ENTITY_COUNT))
 					return;
 			if(entity->is_static){
-				cur_grid->entities.push_back(entity);
+				pair.second->entities.push_back(entity);
 			}
 			else{
-				cur_grid->entities.push_front(entity);
+				pair.second->entities.push_front(entity);
 			}
 			entity_destroy(state, entity, entity->position, entity->size);
-			++cur_grid->entities_alive_count;
+			++pair.second->entities_alive_count;
 		}
 	}
 	// // concise version
@@ -272,21 +298,18 @@ struct E02_EntityCollisionInfo
 static void collision_check(E02_GameState* state)
 {
 	state->frame_collisions_count = 0;
-	for (E02_entitygrid * cur_grid : state->entity_grids)
+	for (auto pair : state->entity_grids)
 	{
-		list<E02_Entity*> entities_copy(cur_grid->entities);
-		for(E02_Entity * e1 : cur_grid->entities)
+		list<E02_Entity*> entities_copy(pair.second->entities);
+		for(E02_Entity * e1 : pair.second->entities)
 		{
-			if (cur_grid->entities.back() == e1){
+			if (pair.second->entities.back() == e1){
 				break;
 			}
 			if (e1->is_static){
 				continue;
 			}
 			entities_copy.pop_front();
-		
-			
-			
 			for(E02_Entity * e2 : entities_copy)
 			{
 				
@@ -350,9 +373,9 @@ static void collision_separate(E02_GameState* state)
 
 static void clamp(E02_GameState* state){
 
-	for (E02_entitygrid * cur_grid : state->entity_grids)
+	for (auto pair : state->entity_grids)
 	{
-		for (E02_Entity * entity : cur_grid->entities)
+		for (E02_Entity * entity : pair.second->entities)
 		{
 				if(entity->position.x + entity->collider_offset.x + entity->collider_radius > WINDOW_W){
 					entity->position.x = WINDOW_W - entity->collider_offset.x - entity->collider_radius;
@@ -397,12 +420,13 @@ static void game_init(E02_SDLContext* context, E02_GameState* state)
 				grid->x_start = i * (WINDOW_W / split);
 				grid->x_end = grid->x_start + WINDOW_W / split;
 
+				
 				grid->y_start = j * (WINDOW_H / split);
 				grid->y_end = grid->y_start + WINDOW_H / split;
 
 				grid->id = idx(i, j, split);
-
-				state->entity_grids.push_back(grid);
+				E02_xy_pair pair = {i, j};
+				state->entity_grids[pair] = grid;
 
 			}
 		}		
@@ -418,10 +442,10 @@ static void game_init(E02_SDLContext* context, E02_GameState* state)
 
 static void game_reset(E02_SDLContext* context, E02_GameState* state)
 {
-	for (E02_entitygrid * cur_grid : state->entity_grids)
+	for (auto pair : state->entity_grids)
 	{
-		cur_grid->entities.clear();
-		cur_grid->entities_alive_count = 0;
+		pair.second->entities.clear();
+		pair.second->entities_alive_count = 0;
 	}
 
 	//SDL_memset(state->entity_grids, 0, CELLS * sizeof(E02_entitygrid));
@@ -484,6 +508,41 @@ static void game_update(E02_SDLContext* context, E02_GameState* state)
 
 	vec2f velocity = normalize(mov) * (128 * context->delta);
 
+	float left = state->player->position.x + state->player->collider_offset.x - state->player->collider_radius;
+	float right = state->player->position.x + state->player->collider_offset.x + state->player->collider_radius;
+	float top = state->player->position.y + state->player->collider_offset.y - state->player->collider_radius;
+	float bottom = state->player->position.y + state->player->collider_offset.y + state->player->collider_radius;
+
+	vec2f a = vec2f{ left, bottom };
+	vec2f b = vec2f{ right, bottom };
+	vec2f c = vec2f{ right, top };
+	vec2f d = vec2f{ left, top };	
+
+	list<vec2f*> positions = {&a,&b,&c,&d};
+	for(vec2f * position : positions){
+		for(int i = 1; i <= split; ++i)
+		{
+			if(position->x < WINDOW_W / split * i){
+				continue; // go to next x split
+			}
+			for(int j = i; j <= split; ++j) // fold horizontally, ending here means that position is within right side of split
+			{
+				if(position->y < WINDOW_W / split * j){ // is y on top
+					continue; // split further on top
+				}
+				else
+				{
+					// position is in this grid
+				}
+			}
+		}
+	}
+	// all grids have been found
+	// any old grid that player is no longer on remove, remove player from grid 
+
+	// any new grid that the player is not on add player to grid
+	
+
 	if(floor(state->player->position.x / split_w) != floor((state->player->position.x + velocity.x) / split_w) ||
 		floor(state->player->position.y / split_h) != floor((state->player->position.y + velocity.y) / split_h))
 		{
@@ -493,9 +552,9 @@ static void game_update(E02_SDLContext* context, E02_GameState* state)
 	
 	state->player->position = state->player->position + velocity;
 	// reset tint
-	for(E02_entitygrid * cur_grid : state->entity_grids)
+	for(auto pair : state->entity_grids)
 	{
-		for(E02_Entity * entity : cur_grid->entities)
+		for(E02_Entity * entity : pair.second->entities)
 			{
 				entity->sprite.tint = COLOR_WHITE;
 			}
@@ -513,10 +572,10 @@ static void game_update(E02_SDLContext* context, E02_GameState* state)
 
 static void game_render(E02_SDLContext* context, E02_GameState* state)
 {
-	for(E02_entitygrid * cur_grid : state->entity_grids)
+	for(auto pair : state->entity_grids)
 	{
 		// render
-		for(E02_Entity * entity : cur_grid->entities)
+		for(E02_Entity * entity : pair.second->entities)
 		{
 			sprite_render(context, entity->position, entity->size, &entity->sprite);
 
