@@ -29,7 +29,7 @@ const int WINDOW_W = 1200;
 const int WINDOW_H = 800;
 
 // amount of objects
-const int ENTITY_COUNT   = 4026;
+const int ENTITY_COUNT   = 1024;
 const int CELLS			 = 4;
 const int split			 = sqrt(CELLS);
 const int split_w		 = WINDOW_W / split;
@@ -222,6 +222,21 @@ static void entity_create(E02_GameState* state, vec2f * start_pos, vec2f * size,
 	}
 }
 
+static void entity_create(E02_Entity * entity, E02_entitygrid * grid)
+{
+	if(!(grid->entities.size() < ENTITY_COUNT)){
+		SDL_Log("TOO MANY ENTITIES, CANNOT CREATE");
+		return;
+	}
+	if(entity->is_static){
+		grid->entities.push_back(entity);
+	}
+	else{
+		grid->entities.push_front(entity);
+	}
+	++grid->entities_alive_count;
+}
+
 
 // NOTE: this only works if nobody holds references to other entities!
 static void entity_destroy(E02_GameState* state, E02_Entity* entity, vec2f pos, vec2f size)
@@ -239,7 +254,7 @@ static void entity_destroy(E02_GameState* state, E02_Entity* entity, vec2f pos, 
 	//SDL_assert(entity < state->entities || entity > state->entities + ENTITY_COUNT);
 
 }
-static void entity_destroy(E02_GameState* state, E02_Entity* entity, E02_entitygrid* cell)
+static void entity_destroy(E02_Entity* entity, E02_entitygrid* cell)
 {
 	//SDL_assert(entity < state->entities || entity > state->entities + ENTITY_COUNT);
 	--cell->entities_alive_count;
@@ -247,35 +262,41 @@ static void entity_destroy(E02_GameState* state, E02_Entity* entity, E02_entityg
 }
 
 
-static void entity_move(E02_GameState* state, E02_Entity * entity, vec2f new_pos)
+static void entity_move_to_grids(E02_GameState* state, E02_Entity * entity)
 {
-	E02_Entity new_entity = { 0 };
-	E02_Entity * new_entity_ptr = &new_entity;
-	int cur_alive;
-	for (auto pair : state->entity_grids)
-	{
+	
+	float left = entity->position.x + entity->collider_offset.x - entity->collider_radius;
+	float right = entity->position.x + entity->collider_offset.x + entity->collider_radius;
+	float top = entity->position.y + entity->collider_offset.y - entity->collider_radius;
+	float bottom = entity->position.y + entity->collider_offset.y + entity->collider_radius;
 
-		if(inRange(pair.second->x_start, pair.second->x_end, new_pos.x, pair.second->y_start, pair.second->y_end, new_pos.y))
-		{
-			cur_alive = pair.second->entities_alive_count;
+	vec2f a = vec2f{ left, bottom };
+	vec2f b = vec2f{ right, bottom };
+	vec2f c = vec2f{ right, top };
+	vec2f d = vec2f{ left, top };
 
-			if(!(cur_alive < ENTITY_COUNT))
-					return;
-			if(entity->is_static){
-				pair.second->entities.push_back(entity);
-			}
-			else{
-				pair.second->entities.push_front(entity);
-			}
-			entity_destroy(state, entity, entity->position, entity->size);
-			++pair.second->entities_alive_count;
+	map<E02_xy_pair, bool> temp_curgrid;
+
+	list<vec2f*> positions = {&a,&b,&c,&d};
+	for(vec2f * position : positions){
+		int i = floor((position->x / WINDOW_W) * split);
+		int j = floor((position->y / WINDOW_H) * split);
+		
+		temp_curgrid[{i,j}] = true;
+	}
+
+	for(auto pair: entity->cur_grids){
+		if(pair.second == true && temp_curgrid.find(pair.first) == temp_curgrid.end()){
+			entity->cur_grids[pair.first] = false;
+			SDL_Log("MOVING ENTITY OUT FROM THIS: %i, %i", pair.first.x, pair.first.y);
+			entity_destroy(entity, state->entity_grids[{pair.first}]);
+		}
+		else if(pair.second == false && temp_curgrid.find(pair.first) != temp_curgrid.end()){
+			entity->cur_grids[pair.first] = true;
+			SDL_Log("MOVING ENTITY INTO THIS: %i, %i", pair.first.x, pair.first.y);
+			entity_create(entity, state->entity_grids[{pair.first}]);
 		}
 	}
-	// // concise version
-	//return &state->entities[state->entities_alive_count++];
-
-	//E02_Entity* ret = &state->entities[idx(0, state->entities_alive_count)];
-	//++state->entities_alive_count;
 
 	return;
 }
@@ -363,9 +384,12 @@ static void collision_separate(E02_GameState* state)
 
 		if(!entity_collision_info.e1->is_static){
 			entity_collision_info.e1->position -= sep;
+			entity_move_to_grids(state, entity_collision_info.e1);
+
 		}
 		if(!entity_collision_info.e2->is_static){
 			entity_collision_info.e2->position += sep;
+			entity_move_to_grids(state, entity_collision_info.e2);
 		}
 
 	}
@@ -464,11 +488,12 @@ static void game_reset(E02_SDLContext* context, E02_GameState* state)
 	player->is_static = false;
 	for(int i = 0; i < split; ++i){
 		for(int j = 0; j < split; ++j){
-			player->cur_grids[{i,j}] = false;
+			E02_xy_pair player_pair = {i, j};
+			player->cur_grids[player_pair] = false;
 		}
 	}
 	
-	entity_create(state, &position, &size, player);
+	entity_move_to_grids(state, player);
 
 	state->player = player;
 	// grid pattern
@@ -490,16 +515,16 @@ static void game_reset(E02_SDLContext* context, E02_GameState* state)
 		entity->sprite.rect = SDL_FRect{ 0, 4*128, 128, 128 };
 		entity->sprite.tint = COLOR_WHITE,
 		entity->sprite.pivot = vec2f{ 0.5f, 0.5f };
-		entity->is_static = true;
+		entity->is_static = false;
 		entity->collider_radius = 6;
-		for(int i = 0; i < split; ++i){
-			for(int j = 0; j < split; ++j){
-				player->cur_grids[{i,j}] = false;
+		for(int j = 0; j < split; ++j){
+			for(int z = 0; z < split; ++z){
+				E02_xy_pair entity_pair = {j, z};
+				entity->cur_grids[entity_pair] = false;
 			}
 		}
-		entity_create(state, &pos, &size, entity);
+		entity_move_to_grids(state, entity);
 	}
-
 }
 
 static void game_update(E02_SDLContext* context, E02_GameState* state)
@@ -516,41 +541,17 @@ static void game_update(E02_SDLContext* context, E02_GameState* state)
 		mov.x += 1;
 
 	vec2f velocity = normalize(mov) * (128 * context->delta);
-
-	float left = state->player->position.x + state->player->collider_offset.x - state->player->collider_radius;
-	float right = state->player->position.x + state->player->collider_offset.x + state->player->collider_radius;
-	float top = state->player->position.y + state->player->collider_offset.y - state->player->collider_radius;
-	float bottom = state->player->position.y + state->player->collider_offset.y + state->player->collider_radius;
-
-	vec2f a = vec2f{ left, bottom };
-	vec2f b = vec2f{ right, bottom };
-	vec2f c = vec2f{ right, top };
-	vec2f d = vec2f{ left, top };
-
-	list<vec2f*> positions = {&a,&b,&c,&d};
-	for(vec2f * position : positions){
-		int i = floor((position->x / WINDOW_W) * split);
-		int j = floor((position->y / WINDOW_H) * split);
-		
-		SDL_Log("%f, %f", floor((position->x / WINDOW_W)) * split, floor((position->y / WINDOW_H)) * split);
-		SDL_Log("%i, %i", i, j);
-
-		
-	}
+	
+	
 	// all grids have been found
 	// any old grid that player is no longer on remove, remove player from grid 
 
 	// any new grid that the player is not on add player to grid
 	
-
-	if(floor(state->player->position.x / split_w) != floor((state->player->position.x + velocity.x) / split_w) ||
-		floor(state->player->position.y / split_h) != floor((state->player->position.y + velocity.y) / split_h))
-		{
-			SDL_Log("MOVING");
-			entity_move(state, state->player, state->player->position + velocity);
-		}	
 	
 	state->player->position = state->player->position + velocity;
+	
+	entity_move_to_grids(state, state->player);
 	// reset tint
 	for(auto pair : state->entity_grids)
 	{
