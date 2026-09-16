@@ -61,7 +61,7 @@ static void game_init(EngineContext* context, E03_GameState* state)
 	// TODO allocate space for tile info (when we'll load those from file)
 	// texture atlases
 	state->atlas = itu_resources_texture_create(context, "data/kenney/tiny_dungeon_packed.png", SDL_SCALEMODE_NEAREST);
-	state->bg    = itu_resources_texture_create(context, "data/kenney/prototype_texture_dark/texture_13.png", SDL_SCALEMODE_LINEAR);
+	state->bg    = itu_resources_texture_create(context, "data/kenney/prototype_texture_dark/texture_13.png", SDL_SCALEMODE_NEAREST);
 }
 
 static void game_reset(EngineContext* context, E03_GameState* state)
@@ -143,8 +143,8 @@ int main(void)
 {
 	EngineConfig config;
 	config.application_name = "ES03 - Coordinate Systems";
-	config.texture_pixels_per_unit = 16;
-	config.camera_pixel_per_unit = 16;
+	config.texture_pixels_per_unit = 128;
+	config.camera_pixel_per_unit = 512;
 	config.step_per_second_fluid = 60;
 
 	bool quit = false;
