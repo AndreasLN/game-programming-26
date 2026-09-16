@@ -9,3 +9,8 @@ target_include_directories(02_hello_sdl PUBLIC lib/SDL/include)
 
 add_executable(03_capped_loop   03_capped_loop.cpp)
 target_link_libraries(03_capped_loop PRIVATE SDL3::SDL3)
+
+add_executable(04_collsisions_with_indices   04_collsisions_with_indices.cpp)
+target_include_directories(04_collsisions_with_indices PRIVATE ${CMAKE_SOURCE_DIR}/lib/stb)
+target_include_directories(04_collsisions_with_indices PRIVATE ${CMAKE_SOURCE_DIR}/lib/itu)
+target_link_libraries(04_collsisions_with_indices PRIVATE SDL3::SDL3)
