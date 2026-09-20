@@ -15,10 +15,22 @@ bool DEBUG_render_textures = true;
 bool DEBUG_render_outlines = true;
 const int ENTITY_COUNT = 4096;
 
+enum Direction{
+	LEFT,
+	RIGHT,
+	UP,
+	DOWN
+};
+
 struct E03_Entity
 {
 	Sprite sprite;
 	Transform2D transform;
+};
+
+struct E03_Character_Entity: public E03_Entity
+{
+	Direction direction = DOWN;
 };
 
 
@@ -58,14 +70,13 @@ map<vec2f, SDL_FRect> map_example = {
 	{{ -6, 0 }, dirt_1}, {{ -5, 0 }, dirt_1}, {{ -4, 0 }, dirt_1}, {{ -3, 0 }, dirt_1}, {{ -2, 0 }, dirt_1}, {{ -1, 0 }, dirt_1}, {{ 0, 0 }, dirt_2}, {{ 1, 0 }, dirt_1}, {{ 2, 0 }, dirt_2}, {{ 3, 0 }, dirt_1}, {{ 4, 0 }, dirt_1}, {{ 5, 0 }, dirt_1},
 	{{ -6, -1}, dirt_1}, {{ -5,-1 }, dirt_1}, {{ -4,-1 }, dirt_1}, {{ -3,-1 }, dirt_1}, {{ -2,-1 }, dirt_1}, {{ -1,-1 }, dirt_1}, {{ 0,-1 }, dirt_2}, {{ 1,-1 }, dirt_1}, {{ 2,-1 }, dirt_2}, {{ 3,-1 }, dirt_1}, {{ 4,-1 }, dirt_1}, {{ 5,-1 }, dirt_1},
 	{{ -6,-2 }, dirt_1}, {{ -5,-2 }, dirt_1}, {{ -4,-2 }, dirt_1}, {{ -3,-2 }, dirt_1}, {{ -2,-2 }, dirt_1}, {{ -1,-2 }, dirt_1}, {{ 0,-2 }, dirt_2}, {{ 1,-2 }, dirt_1}, {{ 2,-2 }, dirt_2}, {{ 3,-2 }, dirt_1}, {{ 4,-2 }, dirt_1}, {{ 5,-2 }, dirt_1},
-
 };
 
 
 struct E03_GameState
 {
 	// shortcut references
-	E03_Entity* player;
+	E03_Character_Entity* player;
 	E03_TileMap* tilemap;
 
 	// game-allocated memory
@@ -165,11 +176,10 @@ static void game_reset(EngineContext* context, E03_GameState* state)
 			entity->sprite.pivot.x = 0.0f;
 			state->tilemap->entities[pair.first] = entity;
 		}
-
 	}
 
 	{
-		state->player = entity_create(state);
+		state->player = (E03_Character_Entity*)entity_create(state);
 		state->player->transform.position = VEC2F_ZERO;
 		state->player->transform.scale = VEC2F_ONE;
 		itu_lib_sprite_init(
@@ -191,16 +201,30 @@ static void game_update(EngineContext* context, E03_GameState* state)
 
 		E03_Entity* entity = state->player;
 		vec2f mov = { 0 };
-		if(context->btn_isdown_up)
+		if(context->btn_isdown_up){
 			mov.y += 1;
-		if(context->btn_isdown_down)
+			state->player->direction = UP;
+		}		
+		if(context->btn_isdown_down){
 			mov.y -= 1;
-		if(context->btn_isdown_left)
+			state->player->direction = DOWN;
+		}	
+		if(context->btn_isdown_left){
 			mov.x -= 1;
-		if(context->btn_isdown_right)
+			state->player->direction = LEFT;	
+		}	
+		if(context->btn_isdown_right){
 			mov.x += 1;
-	
-		//SDL_Log("MOUSE POS: X: %f, Y: %f", context->mouse_pos.x, context->mouse_pos.y);
+			state->player->direction = RIGHT;
+		}
+				
+		if(state->player->direction == LEFT && !state->player->sprite.flip_horizontal){
+			state->player->sprite.flip_horizontal = true;
+		}
+		else if (state->player->direction == RIGHT && state->player->sprite.flip_horizontal){
+			state->player->sprite.flip_horizontal = false;
+		}
+
 		entity->transform.position = entity->transform.position + mov * (player_speed * context->delta);
 
 		// camera follows player
