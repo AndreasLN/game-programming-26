@@ -19,19 +19,64 @@ enum Direction{
 	LEFT,
 	RIGHT,
 	UP,
-	DOWN
+	DOWN,
+	LAST
+};
+
+enum NPCSTATE{
+	MOVING,
+	IDLE,
 };
 
 struct E03_Entity
 {
 	Sprite sprite;
 	Transform2D transform;
+
+	E03_Entity() {
+	}
+
+	E03_Entity(Sprite sprite, Transform2D  transform) 
+	: sprite(sprite), transform(transform) {}
+
 };
 
 struct E03_Character_Entity: public E03_Entity
 {
-	Direction direction = DOWN;
+	Direction direction;
+
+	E03_Character_Entity() {}
+
+	E03_Character_Entity(Sprite  sprite, Transform2D  transform, Direction direction = DOWN)
+	: E03_Entity(sprite, transform), direction(direction) {}
+
 };
+
+struct Random_Timer
+{
+	float min;
+	float max;
+
+	float time = 2;
+
+	Random_Timer(float min, float max) 
+	: min(min), max(max) {time = 2;}
+
+};
+
+struct E03_CharacterNPC_Entity: public E03_Character_Entity
+{
+	Random_Timer * idle_timer;
+	Random_Timer * moving_timer;
+	NPCSTATE state;
+
+	E03_CharacterNPC_Entity() {}
+
+	E03_CharacterNPC_Entity(Sprite sprite, Transform2D transform, Direction direction, Random_Timer * idle, Random_Timer * moving)
+	: E03_Character_Entity(sprite, transform, direction), idle_timer(idle), moving_timer(moving) {state = IDLE;}
+};
+
+
 
 
 bool operator<(const vec2f& lhs, const vec2f& rhs)
@@ -63,6 +108,8 @@ SDL_FRect dirt_1 = SDL_FRect{1, 4, 16, 16};
 
 SDL_FRect dirt_2 = SDL_FRect{0, 4, 16, 16};
 
+SDL_FRect guy = SDL_FRect{1, 7, 16, 16};
+
 map<vec2f, SDL_FRect> map_example = {
 	{{ -6, 3 }, dirt_2}, {{ -5, 3 }, dirt_2}, {{ -4, 3 }, dirt_1}, {{ -3, 3 }, dirt_1}, {{ -2, 3 }, dirt_2}, {{ -1, 3 }, dirt_1}, {{ 0, 3 }, dirt_2}, {{ 1, 3 }, dirt_1}, {{ 2, 3 }, dirt_1}, {{ 3, 3 }, dirt_1}, {{ 4, 3 }, dirt_2}, {{ 5, 3 }, dirt_2},
 	{{ -6, 2 }, dirt_2}, {{ -5, 2 }, dirt_2}, {{ -4, 2 }, dirt_1}, {{ -3, 2 }, dirt_1}, {{ -2, 2 }, dirt_2}, {{ -1, 2 }, dirt_1}, {{ 0, 2 }, dirt_2}, {{ 1, 2 }, dirt_1}, {{ 2, 2 }, dirt_1}, {{ 3, 2 }, dirt_1}, {{ 4, 2 }, dirt_2}, {{ 5, 2 }, dirt_2},
@@ -80,7 +127,8 @@ struct E03_GameState
 	E03_TileMap* tilemap;
 
 	// game-allocated memory
-	E03_Entity* entities;
+	list<E03_Entity*> entities;
+	list<E03_CharacterNPC_Entity*> npcs;
 	int entities_alive_count;
 
 	// SDL-allocated structures
@@ -88,18 +136,19 @@ struct E03_GameState
 	SDL_Texture* bg;
 };
 
-static E03_Entity* entity_create(E03_GameState* state)
+static void entity_create(E03_GameState* state, E03_Entity * entity)
 {
 	if(!(state->entities_alive_count < ENTITY_COUNT))
 		// NOTE: this might as well be an assert, if we don't have a way to recover/handle it
-		return NULL;
+		return;
 
 	// // concise version
 	//return &state->entities[state->entities_alive_count++];
 
-	E03_Entity* ret = &state->entities[state->entities_alive_count];
+	state->entities.push_back(entity);
+	
 	++state->entities_alive_count;
-	return ret;
+	return;
 }
 
 // NOTE: this only works if nobody holds references to other entities!
@@ -108,17 +157,15 @@ static E03_Entity* entity_create(E03_GameState* state)
 static void entity_destroy(E03_GameState* state, E03_Entity* entity)
 {
 	// NOTE: here we want to fail hard, nobody should pass us a pointer not gotten from `entity_create()`
-	SDL_assert(entity < state->entities ||entity > state->entities + ENTITY_COUNT);
-
+	
 	--state->entities_alive_count;
-	*entity = state->entities[state->entities_alive_count];
+	state->entities.remove(entity);
 }
 
 static void game_init(EngineContext* context, E03_GameState* state)
 {
 	// allocate memory
-	state->entities = (E03_Entity*)SDL_calloc(ENTITY_COUNT, sizeof(E03_Entity));
-	SDL_assert(state->entities);
+	state->entities = { };
 
 	// TODO allocate space for tile info (when we'll load those from file)
 	// texture atlases
@@ -144,7 +191,9 @@ static void game_reset(EngineContext* context, E03_GameState* state)
 	state->entities_alive_count = 0;
 	// entities
 	{
-		E03_Entity* bg = entity_create(state);
+		E03_Entity * bg = new E03_Entity();
+
+		entity_create(state, bg);
 		SDL_FRect sprite_rect = SDL_FRect{ 0, 0, 1024, 1024};
 		itu_lib_sprite_init(
 			&bg->sprite,
@@ -152,6 +201,8 @@ static void game_reset(EngineContext* context, E03_GameState* state)
 			itu_lib_sprite_get_source_rect(0, 0, 1024, 1024)
 		);
 		bg->transform.scale = VEC2F_ONE;
+		bg->transform.rotation = 0;
+		bg->transform.position = VEC2F_ZERO;
 	}
 
 	// TILEMAP
@@ -163,9 +214,11 @@ static void game_reset(EngineContext* context, E03_GameState* state)
 		state->tilemap->entities = {};
 
 		for(auto pair : state->tilemap->map){
-			E03_Entity* entity = entity_create(state);
+			E03_Entity* entity = new E03_Entity();
+			entity_create(state, entity);
 			entity->transform.scale = state->tilemap->transform.scale;
 			entity->transform.position = state->tilemap->transform.position + pair.first;
+			entity->transform.rotation = 0;
 
 			itu_lib_sprite_init(
 				&entity->sprite,
@@ -178,10 +231,38 @@ static void game_reset(EngineContext* context, E03_GameState* state)
 		}
 	}
 
+	
+	// NPC
 	{
-		state->player = (E03_Character_Entity*)entity_create(state);
+		for(int i = 0 ; i < 10; ++i){
+			Random_Timer * idle = new Random_Timer(1, 3);
+			Random_Timer * moving = new Random_Timer(2, 4);
+			E03_CharacterNPC_Entity* npc = new E03_CharacterNPC_Entity();
+			entity_create(state, npc);
+			npc->idle_timer = idle;
+			npc->moving_timer = moving;
+			npc->transform.scale = VEC2F_ONE;
+			npc->transform.position = VEC2F_ONE;
+			npc->transform.rotation = 0;
+			npc->state = IDLE;
+			itu_lib_sprite_init(
+				&npc->sprite,
+				state->atlas,
+				itu_lib_sprite_get_source_rect(guy.x, guy.y, guy.w, guy.h)
+			);
+			SDL_Log("%d", npc->state);
+			//npc->sprite.pivot.y = 0.3f;
+			state->npcs.push_front(npc);
+		}
+	}
+
+
+	{
+		state->player = new E03_Character_Entity();
+		entity_create(state, state->player);
 		state->player->transform.position = VEC2F_ZERO;
 		state->player->transform.scale = VEC2F_ONE;
+		state->player->transform.rotation = 0;
 		itu_lib_sprite_init(
 			&state->player->sprite,
 			state->atlas,
@@ -191,7 +272,6 @@ static void game_reset(EngineContext* context, E03_GameState* state)
 		// raise sprite a bit, so that the position concides with the center of the image
 		state->player->sprite.pivot.y = 0.3f;
 	}
-	
 }
 
 static void game_update(EngineContext* context, E03_GameState* state)
@@ -230,13 +310,72 @@ static void game_update(EngineContext* context, E03_GameState* state)
 		// camera follows player
 		context->camera_active->world_position = entity->transform.position;
 	}
+
+	const float npc_speed = 1.5;
+
+	for(E03_CharacterNPC_Entity * npc : state->npcs){
+		vec2f mov = { 0 };
+		//SDL_Log("%d", npc->state);
+		switch (npc->state)
+		{
+			case IDLE:
+
+				if (npc->idle_timer->time > 0.0f){
+					npc->idle_timer->time -= context->delta;
+				}
+				else{
+					npc->state = MOVING;
+					npc->moving_timer->time = npc->moving_timer->max + SDL_randf() * (npc->moving_timer->min - npc->moving_timer->max);
+					npc->direction = Direction(SDL_rand(LAST - 1));
+
+				}
+				break;
+			case MOVING:
+				if (npc->moving_timer->time > 0){
+					switch (npc->direction)
+					{
+					case UP:
+						mov.y += 1;
+						break;
+					case DOWN:
+						mov.y -= 1;
+						break;
+					case LEFT:
+						mov.x -= 1;
+						break;
+					case RIGHT:
+						mov.x += 1;
+						break;
+					default:
+						break;
+					}
+					if(npc->direction == LEFT && !npc->sprite.flip_horizontal){
+						npc->sprite.flip_horizontal = true;
+					}
+					else if (npc->direction == RIGHT && npc->sprite.flip_horizontal){
+						npc->sprite.flip_horizontal = false;
+					}
+
+					npc->transform.position = npc->transform.position + mov * (npc_speed * context->delta);
+					npc->moving_timer->time -= context->delta;
+				}
+				else{
+					npc->state = IDLE;
+					npc->idle_timer->time = npc->idle_timer->max + SDL_randf() * (npc->idle_timer->min - npc->idle_timer->max);
+				}
+				break;
+
+			default:
+				break;
+			}
+	}
+
 }
 
 static void game_render(EngineContext* context, E03_GameState* state)
 {
-	for(int i = 0; i < state->entities_alive_count; ++i)
+	for(E03_Entity * entity : state->entities)
 	{
-		E03_Entity* entity = &state->entities[i];
 		// render texture
 		SDL_FRect rect_src = entity->sprite.rect;
 		SDL_FRect rect_dst;
@@ -295,13 +434,13 @@ int main(void)
 				{
 	
 					vec2f world_point = itu_lib_context_point_screen_to_window(&context, context.mouse_pos);
-					SDL_Log("WORLD: MOUSE POS: X, %f, POS: Y, %f", world_point.x, world_point.y);
-					SDL_Log("CAMERA: MOUSE POS: X, %f, POS: Y, %f", context.mouse_pos.x, context.mouse_pos.y);
+					//SDL_Log("WORLD: MOUSE POS: X, %f, POS: Y, %f", world_point.x, world_point.y);
+					//SDL_Log("CAMERA: MOUSE POS: X, %f, POS: Y, %f", context.mouse_pos.x, context.mouse_pos.y);
 					context.mouse_pos.x = event.motion.x;
 					context.mouse_pos.y = event.motion.y;
 					vec2f point = itu_lib_context_point_screen_to_global(&context, context.mouse_pos);
-					SDL_Log("SCREEN: MOUSE POS: X, %f, POS: Y, %f", point.x, point.y);
-					SDL_Log("SCREEN FLOORED: MOUSE POS: X, %f, POS: Y, %f", floorf(point.x), floor(point.y));
+					//SDL_Log("SCREEN: MOUSE POS: X, %f, POS: Y, %f", point.x, point.y);
+					//SDL_Log("SCREEN FLOORED: MOUSE POS: X, %f, POS: Y, %f", floorf(point.x), floor(point.y));
 					
 					
 					context.mouse_delta.x = event.motion.xrel;
