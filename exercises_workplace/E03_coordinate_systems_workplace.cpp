@@ -30,9 +30,19 @@ bool operator<(const vec2f& lhs, const vec2f& rhs)
         return lhs.y < rhs.y;
     }
 }
+bool operator==(const vec2f& lhs, const vec2f& rhs)
+{
+	if(lhs.x == rhs.x && lhs.y == rhs.y){
+   		 return true;
+	}
+	else{
+		return false;
+	}
+};
 
 struct E03_TileMap
 {
+	map<vec2f, E03_Entity*> entities; // easier lookup for entities in tilemap;
 	map<vec2f, SDL_FRect> map; // Each sprite has unique transform
 	Transform2D transform;
 };
@@ -120,6 +130,7 @@ static void game_reset(EngineContext* context, E03_GameState* state)
 		state->tilemap->transform.position = VEC2F_ZERO;
 		state->tilemap->transform.scale = VEC2F_ONE;
 		state->tilemap->map = map_example;
+		state->tilemap->entities = {};
 
 		for(auto pair : state->tilemap->map){
 			E03_Entity* entity = entity_create(state);
@@ -133,6 +144,7 @@ static void game_reset(EngineContext* context, E03_GameState* state)
 			);
 			entity->sprite.pivot.y = 0.0f;
 			entity->sprite.pivot.x = 0.0f;
+			state->tilemap->entities[pair.first] = entity;
 		}
 
 	}
@@ -191,6 +203,8 @@ static void game_render(EngineContext* context, E03_GameState* state)
 
 		if(DEBUG_render_outlines)
 			itu_lib_sprite_render_debug(context, &entity->sprite, &entity->transform);
+		
+		entity->sprite.tint.r = 1;
 	}
 
 	// debug window
@@ -222,6 +236,18 @@ int main(void)
 
 	while(!quit)
 	{
+
+		// TINT WITH MOUSE
+		vec2f point = itu_lib_context_point_screen_to_global(&context, context.mouse_pos);
+		try
+		{
+			auto entity = state.tilemap->entities.at(vec2f{floorf(point.x), floorf(point.y)});
+			entity->sprite.tint.r = 100;
+		}
+		catch(const std::exception& e)
+		{
+		}
+
 		// input
 		SDL_Event event;
 		itu_lib_input_clear(&context);
@@ -242,6 +268,9 @@ int main(void)
 					context.mouse_pos.y = event.motion.y;
 					vec2f point = itu_lib_context_point_screen_to_global(&context, context.mouse_pos);
 					SDL_Log("SCREEN: MOUSE POS: X, %f, POS: Y, %f", point.x, point.y);
+					SDL_Log("SCREEN FLOORED: MOUSE POS: X, %f, POS: Y, %f", floorf(point.x), floor(point.y));
+					
+					
 					context.mouse_delta.x = event.motion.xrel;
 					context.mouse_delta.y = event.motion.yrel;
 					break;
