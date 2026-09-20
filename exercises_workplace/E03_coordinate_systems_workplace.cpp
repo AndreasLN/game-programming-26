@@ -2,6 +2,15 @@
 
 #include <itu_engine.hpp>
 
+using namespace std;
+#include <list>
+
+using namespace std;
+#include <string>
+
+using namespace std;
+#include <map>
+
 bool DEBUG_render_textures = true;
 bool DEBUG_render_outlines = true;
 const int ENTITY_COUNT = 4096;
@@ -12,10 +21,36 @@ struct E03_Entity
 	Transform2D transform;
 };
 
+
+bool operator<(const vec2f& lhs, const vec2f& rhs)
+{
+    if (lhs.x != rhs.x) {
+        return lhs.x < rhs.x;
+    } else {
+        return lhs.y < rhs.y;
+    }
+}
+
+struct E03_TileMap
+{
+	map<vec2f, SDL_FRect> map; // Each sprite has unique transform
+	Transform2D transform;
+};
+
+SDL_FRect dirt_1 = SDL_FRect{1, 4, 16, 16};
+
+SDL_FRect dirt_2 = SDL_FRect{0, 4, 16, 16};
+
+map<vec2f, SDL_FRect> map_example = {
+	{{ -5, 1 }, dirt_2}, {{ -4, 1 }, dirt_1}, {{ -3, 1 }, dirt_1}, {{ -2, 1 }, dirt_2}, {{ -1, 1 }, dirt_1}, {{ 0, 1 }, dirt_2}, {{ 1, 1 }, dirt_1}, {{ 2, 1 }, dirt_1}, {{ 3, 1 }, dirt_1}, {{ 4, 1 }, dirt_2}, 
+	{{ -6, 0 }, dirt_1}, {{ -5, 0 }, dirt_1}, {{ -4, 0 }, dirt_1}, {{ -3, 0 }, dirt_1}, {{ -2, 0 }, dirt_1}, {{ -1, 0 }, dirt_1}, {{ 0, 0 }, dirt_2}, {{ 1, 0 }, dirt_1}, {{ 2, 0 }, dirt_2}, {{ 3, 0 }, dirt_1}, {{ 4, 0 }, dirt_1}, {{ 5, 0 }, dirt_1}, };
+
+
 struct E03_GameState
 {
 	// shortcut references
 	E03_Entity* player;
+	E03_TileMap* tilemap;
 
 	// game-allocated memory
 	E03_Entity* entities;
@@ -79,6 +114,29 @@ static void game_reset(EngineContext* context, E03_GameState* state)
 		bg->transform.scale = VEC2F_ONE;
 	}
 
+	// TILEMAP
+	{
+		state->tilemap = new E03_TileMap();
+		state->tilemap->transform.position = VEC2F_ZERO;
+		state->tilemap->transform.scale = VEC2F_ONE;
+		state->tilemap->map = map_example;
+
+		for(auto pair : state->tilemap->map){
+			E03_Entity* entity = entity_create(state);
+			entity->transform.scale = state->tilemap->transform.scale;
+			entity->transform.position = state->tilemap->transform.position + pair.first;
+
+			itu_lib_sprite_init(
+				&entity->sprite,
+				state->atlas,
+				itu_lib_sprite_get_source_rect(pair.second.x, pair.second.y, pair.second.w, pair.second.h)
+			);
+			entity->sprite.pivot.y = 0.0f;
+			entity->sprite.pivot.x = 0.0f;
+		}
+
+	}
+
 	{
 		state->player = entity_create(state);
 		state->player->transform.position = VEC2F_ZERO;
@@ -92,12 +150,13 @@ static void game_reset(EngineContext* context, E03_GameState* state)
 		// raise sprite a bit, so that the position concides with the center of the image
 		state->player->sprite.pivot.y = 0.3f;
 	}
+	
 }
 
 static void game_update(EngineContext* context, E03_GameState* state)
 {
 	{
-		const float player_speed = 1;
+		const float player_speed = 2;
 
 		E03_Entity* entity = state->player;
 		vec2f mov = { 0 };
@@ -143,8 +202,8 @@ int main(void)
 {
 	EngineConfig config;
 	config.application_name = "ES03 - Coordinate Systems";
-	config.texture_pixels_per_unit = 128;
-	config.camera_pixel_per_unit = 512;
+	config.texture_pixels_per_unit = 16;
+	config.camera_pixel_per_unit = 64;
 	config.step_per_second_fluid = 60;
 
 	bool quit = false;
