@@ -209,7 +209,6 @@ vec2f itu_lib_context_point_screen_to_window(EngineContext* context, vec2f p)
 
 	vec2f native_window_size = { (float)context->config.window_w, (float)context->config.window_h };
 	vec2f ret = p + mul_element_wise(camera->normalized_screen_offset, native_window_size);
-	SDL_Log("HEEEELLLOOOO?, %f, %f", mul_element_wise(camera->normalized_screen_offset, native_window_size).x, mul_element_wise(camera->normalized_screen_offset, native_window_size).y);
 	return ret;
 }
 

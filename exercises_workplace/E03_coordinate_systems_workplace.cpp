@@ -52,8 +52,14 @@ SDL_FRect dirt_1 = SDL_FRect{1, 4, 16, 16};
 SDL_FRect dirt_2 = SDL_FRect{0, 4, 16, 16};
 
 map<vec2f, SDL_FRect> map_example = {
-	{{ -5, 1 }, dirt_2}, {{ -4, 1 }, dirt_1}, {{ -3, 1 }, dirt_1}, {{ -2, 1 }, dirt_2}, {{ -1, 1 }, dirt_1}, {{ 0, 1 }, dirt_2}, {{ 1, 1 }, dirt_1}, {{ 2, 1 }, dirt_1}, {{ 3, 1 }, dirt_1}, {{ 4, 1 }, dirt_2}, 
-	{{ -6, 0 }, dirt_1}, {{ -5, 0 }, dirt_1}, {{ -4, 0 }, dirt_1}, {{ -3, 0 }, dirt_1}, {{ -2, 0 }, dirt_1}, {{ -1, 0 }, dirt_1}, {{ 0, 0 }, dirt_2}, {{ 1, 0 }, dirt_1}, {{ 2, 0 }, dirt_2}, {{ 3, 0 }, dirt_1}, {{ 4, 0 }, dirt_1}, {{ 5, 0 }, dirt_1}, };
+	{{ -6, 3 }, dirt_2}, {{ -5, 3 }, dirt_2}, {{ -4, 3 }, dirt_1}, {{ -3, 3 }, dirt_1}, {{ -2, 3 }, dirt_2}, {{ -1, 3 }, dirt_1}, {{ 0, 3 }, dirt_2}, {{ 1, 3 }, dirt_1}, {{ 2, 3 }, dirt_1}, {{ 3, 3 }, dirt_1}, {{ 4, 3 }, dirt_2}, {{ 5, 3 }, dirt_2},
+	{{ -6, 2 }, dirt_2}, {{ -5, 2 }, dirt_2}, {{ -4, 2 }, dirt_1}, {{ -3, 2 }, dirt_1}, {{ -2, 2 }, dirt_2}, {{ -1, 2 }, dirt_1}, {{ 0, 2 }, dirt_2}, {{ 1, 2 }, dirt_1}, {{ 2, 2 }, dirt_1}, {{ 3, 2 }, dirt_1}, {{ 4, 2 }, dirt_2}, {{ 5, 2 }, dirt_2},
+	{{ -6, 1 }, dirt_2}, {{ -5, 1 }, dirt_2}, {{ -4, 1 }, dirt_1}, {{ -3, 1 }, dirt_1}, {{ -2, 1 }, dirt_2}, {{ -1, 1 }, dirt_1}, {{ 0, 1 }, dirt_2}, {{ 1, 1 }, dirt_1}, {{ 2, 1 }, dirt_1}, {{ 3, 1 }, dirt_1}, {{ 4, 1 }, dirt_2}, {{ 5, 1 }, dirt_2},
+	{{ -6, 0 }, dirt_1}, {{ -5, 0 }, dirt_1}, {{ -4, 0 }, dirt_1}, {{ -3, 0 }, dirt_1}, {{ -2, 0 }, dirt_1}, {{ -1, 0 }, dirt_1}, {{ 0, 0 }, dirt_2}, {{ 1, 0 }, dirt_1}, {{ 2, 0 }, dirt_2}, {{ 3, 0 }, dirt_1}, {{ 4, 0 }, dirt_1}, {{ 5, 0 }, dirt_1},
+	{{ -6, -1}, dirt_1}, {{ -5,-1 }, dirt_1}, {{ -4,-1 }, dirt_1}, {{ -3,-1 }, dirt_1}, {{ -2,-1 }, dirt_1}, {{ -1,-1 }, dirt_1}, {{ 0,-1 }, dirt_2}, {{ 1,-1 }, dirt_1}, {{ 2,-1 }, dirt_2}, {{ 3,-1 }, dirt_1}, {{ 4,-1 }, dirt_1}, {{ 5,-1 }, dirt_1},
+	{{ -6,-2 }, dirt_1}, {{ -5,-2 }, dirt_1}, {{ -4,-2 }, dirt_1}, {{ -3,-2 }, dirt_1}, {{ -2,-2 }, dirt_1}, {{ -1,-2 }, dirt_1}, {{ 0,-2 }, dirt_2}, {{ 1,-2 }, dirt_1}, {{ 2,-2 }, dirt_2}, {{ 3,-2 }, dirt_1}, {{ 4,-2 }, dirt_1}, {{ 5,-2 }, dirt_1},
+
+};
 
 
 struct E03_GameState
@@ -260,7 +266,7 @@ int main(void)
 					break;
 				case SDL_EVENT_MOUSE_MOTION:
 				{
-		
+	
 					vec2f world_point = itu_lib_context_point_screen_to_window(&context, context.mouse_pos);
 					SDL_Log("WORLD: MOUSE POS: X, %f, POS: Y, %f", world_point.x, world_point.y);
 					SDL_Log("CAMERA: MOUSE POS: X, %f, POS: Y, %f", context.mouse_pos.x, context.mouse_pos.y);
