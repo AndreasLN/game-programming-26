@@ -115,6 +115,19 @@ static void game_init(EngineContext* context, E03_GameState* state)
 	state->bg    = itu_resources_texture_create(context, "data/kenney/prototype_texture_dark/texture_13.png", SDL_SCALEMODE_NEAREST);
 }
 
+static void mouse_tint(EngineContext* context, E03_GameState* state){
+		// TINT WITH MOUSE
+		vec2f point = itu_lib_context_point_screen_to_global(context, context->mouse_pos);
+		try
+		{
+			auto entity = state->tilemap->entities.at(vec2f{floorf(point.x), floorf(point.y)});
+			entity->sprite.tint.r = 100;
+		}
+		catch(const std::exception& e)
+		{
+		}
+}
+
 static void game_reset(EngineContext* context, E03_GameState* state)
 {
 	state->entities_alive_count = 0;
@@ -242,17 +255,7 @@ int main(void)
 
 	while(!quit)
 	{
-
-		// TINT WITH MOUSE
-		vec2f point = itu_lib_context_point_screen_to_global(&context, context.mouse_pos);
-		try
-		{
-			auto entity = state.tilemap->entities.at(vec2f{floorf(point.x), floorf(point.y)});
-			entity->sprite.tint.r = 100;
-		}
-		catch(const std::exception& e)
-		{
-		}
+		mouse_tint(&context, &state);
 
 		// input
 		SDL_Event event;
