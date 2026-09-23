@@ -18,7 +18,7 @@ const int COLLISION_FILTER_PLAYER         = 0b00001;
 const int COLLISION_FILTER_GROUND         = 0b00010;
 const int COLLISION_FILTER_CLUTTER        = 0b00100;
 const int COLLISION_FILTER_CLUTTER_SENSOR = 0b01000;
-const float GRAVITY      = -9.8f;
+const float GRAVITY      = -0.0f;
 bool DEBUG_render_textures = true;
 bool DEBUG_render_outlines = false;
 bool DEBUG_physics = true;
@@ -61,7 +61,7 @@ struct E04_PlayerData
 	float t_h; // jump duration (for current jump)
 };
 
-static float player_dynamic_gravity = -9.8f;
+static float player_dynamic_gravity = 0.0f;
 static float player_dynamic_jump_impulse = 3;
 static float player_dynamic_mov_force = 10;
 
@@ -214,8 +214,54 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 
 	// Holes
 	{
-		
 
+
+
+	}
+
+	//Balls
+	{
+		b2BodyDef balls_body_def = b2DefaultBodyDef();
+		balls_body_def.type = b2_dynamicBody;
+		balls_body_def.fixedRotation = false;
+
+		// collider shape (to enable collisions with the ground)
+		b2ShapeDef balls_shape_def = b2DefaultShapeDef();
+		balls_shape_def.density = 1;
+		balls_shape_def.filter.categoryBits = COLLISION_FILTER_CLUTTER;
+
+		// sensor shape (to enable interaction with the player)
+		b2ShapeDef balls_shape_def_clutter = b2DefaultShapeDef();
+		balls_shape_def_clutter.density = 0;
+		balls_shape_def_clutter.isSensor = true;
+		balls_shape_def_clutter.enableSensorEvents = true;
+		balls_shape_def_clutter.filter.categoryBits = COLLISION_FILTER_CLUTTER_SENSOR;
+		balls_shape_def_clutter.filter.maskBits     = COLLISION_FILTER_PLAYER;
+		
+		b2Polygon polygon_circle = b2MakeBox(0.5f, 0.5f);
+		for(int i = 0; i < 8; ++i)
+		{
+			E04_Entity* ball_entity = entity_create(state);
+			ball_entity->transform.scale = VEC2F_ONE;
+
+			vec2f size = itu_lib_sprite_get_world_size(context, &ball_entity->sprite, &ball_entity->transform);
+			vec2f offset = -mul_element_wise(size, ball_entity->sprite.pivot - vec2f{ 0.5f, 0.5f });
+
+			b2Circle ball_circle;
+			ball_circle.radius = 0.5f;
+			ball_circle.center = value_cast(b2Vec2, offset);
+			balls_body_def.position = b2Vec2{ 3.0f + (i % 4) * 1.5f, (i / 4) * 3.0f };
+			balls_body_def.rotation = b2MakeRot(SDL_randf() * TAU);
+			balls_body_def.angularVelocity = 1;
+			ball_entity->body_id = b2CreateBody(state->world_id, &balls_body_def);
+			b2CreateCircleShape(ball_entity->body_id, &balls_shape_def, &ball_circle);
+			b2CreateCircleShape(ball_entity->body_id, &balls_shape_def_clutter, &ball_circle);
+			itu_lib_sprite_init(
+				&ball_entity->sprite,
+				state->atlas,
+				itu_lib_sprite_get_source_rect(3, 8, 16, 16)
+			);
+		}
 
 	}
 
@@ -278,7 +324,7 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 	}
 
 
-#if 1
+#if 0
 	// clutter
 	{
 		b2BodyDef body_def = b2DefaultBodyDef();
