@@ -67,6 +67,17 @@ struct E04_PlayerData
 	float t_h; // jump duration (for current jump)
 };
 
+
+bool operator<(const b2BodyId& lhs, const b2BodyId& rhs)
+{
+    return lhs.index1 < rhs.index1;
+}
+
+bool operator==(const b2ShapeId& lhs, const b2ShapeId& rhs)
+{
+    return lhs.index1 == rhs.index1;
+}
+
 static float player_dynamic_gravity = 0.0f;
 static float player_dynamic_jump_impulse = 3;
 static float player_dynamic_mov_force = 10;
@@ -77,7 +88,7 @@ struct E04_GameState
 	E04_Entity* player;
 
 	// game-allocated memory
-	list<E04_Entity*> entities;
+	map<b2BodyId, E04_Entity*> entities;
 	list<b2ShapeId> ball_shape_ids;
 	int entities_alive_count;
 	E04_PlayerData player_data;
@@ -89,7 +100,7 @@ struct E04_GameState
 	b2WorldId world_id;
 };
 
-static void entity_create(E04_GameState* state, E04_Entity * entity)
+static void entity_create(E04_GameState* state, E04_Entity * entity, b2BodyId bodyId)
 {
 	if(!(state->entities_alive_count < ENTITY_COUNT))
 		// NOTE: this might as well be an assert, if we don't have a way to recover/handle it
@@ -98,7 +109,7 @@ static void entity_create(E04_GameState* state, E04_Entity * entity)
 	// // concise version
 	//return &state->entities[state->entities_alive_count++];
 
-	state->entities.push_back(entity);
+	state->entities[bodyId] = entity;
 	++state->entities_alive_count;
 	return;
 }
@@ -106,11 +117,26 @@ static void entity_create(E04_GameState* state, E04_Entity * entity)
 // NOTE: this only works if nobody holds references to other entities!
 //       if that were the case, we couldn't swap them around.
 //       We will see in later lectures how to handle this kind of problems
-static void entity_destroy(E04_GameState* state, E04_Entity* entity)
+static void entity_destroy(E04_GameState* state, b2BodyId bodyId)
 {
 	// NOTE: here we want to fail hard, nobody should pass us a pointer not gotten from `entity_create()`
-
-	state->entities.remove(entity);
+	list<b2ShapeId>::iterator it = state->ball_shape_ids.begin();
+	
+	while (it != state->ball_shape_ids.end()){
+		b2ShapeId shape = *it;
+		
+		int32_t index =	b2Shape_GetBody(shape).index1;
+		if(index == bodyId.index1){
+			SDL_Log("removing shape: %d", shape.index1);
+			it = state->ball_shape_ids.erase(it);
+			b2DestroyShape(shape, false);
+			continue;
+		}
+		it++;
+	}
+	SDL_Log("removing body: %d", bodyId.index1);
+	state->entities.erase(bodyId);
+	b2DestroyBody(bodyId);
 	--state->entities_alive_count;
 }
 
@@ -185,7 +211,6 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 	// player
 	{
 		E04_Entity* entity = new E04_Entity();
-		entity_create(state, entity);
 		state->player = entity;
 		entity->transform.position = VEC2F_ZERO;
 		entity->transform.scale = VEC2F_ONE;
@@ -221,7 +246,11 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 			#if player
 		 	b2CreateCircleShape(entity->body_id, &shape_def, &circle);
 			#endif
+
+			entity_create(state, entity, entity->body_id);
 		}
+
+
 	}
 
 
@@ -251,12 +280,11 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		balls_shape_def_clutter.enableSensorEvents = true;
 		balls_shape_def_clutter.enableHitEvents = true;
 		balls_shape_def_clutter.filter.categoryBits = COLLISION_FILTER_CLUTTER_SENSOR;
-		balls_shape_def_clutter.filter.maskBits     = COLLISION_FILTER_GROUND;
+		balls_shape_def_clutter.filter.maskBits     = COLLISION_FILTER_HOLE;
 		
 		for(int i = 0; i < 8; ++i)
 		{
 			E04_Entity* ball_entity = new E04_Entity();
-			entity_create(state, ball_entity);
 			ball_entity->transform.scale = VEC2F_ONE;
 
 			vec2f size = itu_lib_sprite_get_world_size(context, &ball_entity->sprite, &ball_entity->transform);
@@ -269,6 +297,8 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 			balls_body_def.rotation = b2MakeRot(SDL_randf() * TAU);
 			balls_body_def.angularVelocity = 1;
 			ball_entity->body_id = b2CreateBody(state->world_id, &balls_body_def);
+
+			entity_create(state, ball_entity, ball_entity->body_id);
 
 			b2ShapeId col_id = b2CreateCircleShape(ball_entity->body_id, &balls_shape_def, &ball_circle);
 			b2Shape_SetRestitution(col_id, 0.8);
@@ -305,8 +335,10 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		b2Polygon polygon_bottom = b2MakeBox(8.0f, 1.0f);
 
 		E04_Entity* entity_bottom = new E04_Entity();
-		entity_create(state, entity_bottom);
 		entity_bottom->body_id = b2CreateBody(state->world_id, &body_def_bottom);
+
+		entity_create(state, entity_bottom, entity_bottom->body_id);
+
 		b2CreatePolygonShape(entity_bottom->body_id, &shape_def_bottom, &polygon_bottom);
 
 		//TOP
@@ -321,8 +353,8 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		b2Polygon polygon_top = b2MakeBox(8.0f, 1.0f);
 
 		E04_Entity* entity_top = new E04_Entity(); 
-		entity_create(state, entity_top);
 		entity_top->body_id = b2CreateBody(state->world_id, &body_def_top);
+		entity_create(state, entity_top, entity_top->body_id);
 		b2CreatePolygonShape(entity_top->body_id, &shape_def_top, &polygon_top);
 
 		//LEFT
@@ -337,8 +369,10 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		b2Polygon polygon_left = b2MakeBox(1.0f, 8.0f);
 
 		E04_Entity* entity_left = new E04_Entity(); 
-		entity_create(state, entity_left);
 		entity_left->body_id = b2CreateBody(state->world_id, &body_def_left);
+		
+		entity_create(state, entity_left, entity_left->body_id);
+
 		b2CreatePolygonShape(entity_left->body_id, &shape_def_left, &polygon_left);
 
 		//RIGHT
@@ -351,8 +385,10 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		b2Polygon polygon_right = b2MakeBox(1.0f, 8.0f);
 
 		E04_Entity* entity_right = new E04_Entity();
-		entity_create(state, entity_right);
+
 		entity_right->body_id = b2CreateBody(state->world_id, &body_def_right);
+		entity_create(state, entity_right, entity_right->body_id);
+
 		b2CreatePolygonShape(entity_right->body_id, &shape_def_right, &polygon_right);
 
 		// Holes
@@ -364,12 +400,11 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 			hole_shape_def.isSensor = true;
 			hole_shape_def.enableSensorEvents = true;
 			hole_shape_def.filter.categoryBits = COLLISION_FILTER_HOLE;
-			hole_shape_def.filter.maskBits     = COLLISION_FILTER_CLUTTER;
+			hole_shape_def.filter.maskBits     = COLLISION_FILTER_CLUTTER_SENSOR;
 			for (int i = 0; i < 2; ++i){
 				for (int j = 0; j < 2; ++j){
 				
 					E04_Entity* hole_entity = new E04_Entity();
-					entity_create(state, hole_entity);
 					hole_entity->transform.scale = vec2f{2, 2};
 					hole_entity->transform.rotation = 0;
 
@@ -383,6 +418,8 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 						(-8.0f + ball_circle.radius) + i * (16 - ball_circle.radius * 2) , 
 						(-6.0f + ball_circle.radius) + j * (12 - ball_circle.radius * 2)};
 					hole_entity->body_id = b2CreateBody(state->world_id, &hole_body_def);
+					
+					entity_create(state, hole_entity, hole_entity->body_id);
 
 					b2ShapeId col_id = b2CreateCircleShape(hole_entity->body_id, &hole_shape_def, &ball_circle);
 
@@ -396,11 +433,8 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		}
 
 	}
-
-	
 	for(auto shape : state->ball_shape_ids){
-			b2Circle circle =  b2Shape_GetCircle(shape);
-			
+			b2Circle circle =  b2Shape_GetCircle(shape);	
 	}
 
 
@@ -448,7 +482,6 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		}
 	}
 #endif
-
 	// debug draw
 	debug_draw.context = context;
 	debug_draw.drawShapes = true;
@@ -523,6 +556,23 @@ static void game_update(EngineContext* context, E04_GameState* state)
 		}
 	}
 
+	// Holes
+	{
+		b2SensorEvents sensorevents = b2World_GetSensorEvents(state->world_id);
+		for(int i = 0; i < sensorevents.beginCount; ++i){
+			b2SensorBeginTouchEvent event = sensorevents.beginEvents[i];
+			if(event.visitorShapeId.index1 > -1){
+				b2Filter filter_a = b2Shape_GetFilter(event.sensorShapeId);
+				b2Filter filter_b = b2Shape_GetFilter(event.visitorShapeId);
+				if(filter_a.categoryBits & COLLISION_FILTER_HOLE){
+					entity_destroy(state, b2Shape_GetBody(event.visitorShapeId));
+					break;
+				}
+			}
+		}
+
+	}
+
 	// NOTE: we are compouding precision errors here (config specifies frequency in steps per second, we convert to period in nanos,
 	//       and here we convert back to seconds), but specifying what you want once and expressing everything else in function of
 	//       it avoids mismatching. A more advanced implementation would have independent loop frequencies for game and physics and
@@ -530,12 +580,10 @@ static void game_update(EngineContext* context, E04_GameState* state)
 	b2World_Step(state->world_id, NS_TO_SECONDS(context->target_framerate_fixed_ns), 4);
 
 	// entities
-	for(E04_Entity * entity : state->entities)
+	for(auto pair : state->entities)
 	{
+		E04_Entity * entity = pair.second;
 		b2Vec2 physics_vel = b2Body_GetLinearVelocity(entity->body_id);
-
-		
-
 		b2Vec2 physics_pos = b2Body_GetPosition(entity->body_id);
 		b2Rot  physics_rot = b2Body_GetRotation(entity->body_id);
 		entity->velocity = value_cast(vec2f, physics_vel);
@@ -563,8 +611,9 @@ static void game_render(EngineContext* context, E04_GameState* state)
 	if(context->btn_isjustpressed[BTN_TYPE_DEBUG_F3]) DEBUG_physics = !DEBUG_physics;
 
 	// entities
-	for(auto entity : state->entities)
+	for(auto pair : state->entities)
 	{
+		E04_Entity * entity = pair.second;
 		// render texture
 		SDL_FRect rect_src = entity->sprite.rect;
 		SDL_FRect rect_dst;
