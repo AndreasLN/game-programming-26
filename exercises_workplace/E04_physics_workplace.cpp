@@ -51,11 +51,16 @@ struct E04_PlayerData
 	float h;   // jump height
 	float x_h; // jump horizontal distance
 
-	bool grounded;
-
 	// runtime (jupm)
 	float g;   // gravity (for current jump)
 	vec2f p_0; // initial position (for current jump)
+
+	// DETERMINES WHERE BILLARD POLE HITS
+	b2Vec2 startClick;
+	b2Vec2 endClick;
+
+	bool started; // has player clicked once?
+
 	float v_0; // initial VERTICAL velocity (for current jump)
 	float v_x; // initial foot speed (for current jump)
 	float t_h; // jump duration (for current jump)
@@ -72,6 +77,7 @@ struct E04_GameState
 
 	// game-allocated memory
 	list<E04_Entity*> entities;
+	list<b2ShapeId> ball_shape_ids;
 	int entities_alive_count;
 	E04_PlayerData player_data;
 
@@ -109,7 +115,6 @@ static void entity_destroy(E04_GameState* state, E04_Entity* entity)
 
 void compute_jump_parameters(E04_PlayerData* data)
 {
-	data->grounded = false;
 	data->v_0 = (2*data->h*data->v_x) / (data->x_h);
 	data->g   = (-2*data->h * data->v_x * data->v_x) / (data->x_h * data->x_h);
 }
@@ -136,6 +141,10 @@ static void game_init(EngineContext* context, E04_GameState* state)
 	itu_lib_input_set_mapping_keyboard(context, SDLK_Q, BTN_TYPE_ACTION_0);
 	itu_lib_input_set_mapping_keyboard(context, SDLK_E, BTN_TYPE_ACTION_1);
 	itu_lib_input_set_mapping_keyboard(context, SDLK_SPACE, BTN_TYPE_SPACE);
+
+	itu_lib_input_set_mapping_mouse(context, 1, BTN_TYPE_ACTION_0); //leftclick
+	itu_lib_input_set_mapping_mouse(context, 3, BTN_TYPE_ACTION_1); //rightclick
+
 
 	itu_lib_input_set_mapping_keyboard(context, SDLK_F1, BTN_TYPE_DEBUG_F1);
 	itu_lib_input_set_mapping_keyboard(context, SDLK_TAB, BTN_TYPE_DEBUG_RESET);
@@ -170,6 +179,7 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 	b2World_SetHitEventThreshold(state->world_id, 0);
 
 	state->entities_alive_count = 0;
+	state->ball_shape_ids = {};
 
 	// player
 	{
@@ -207,7 +217,7 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 			circle.radius = 0.5f;
 			circle.center = value_cast(b2Vec2, offset);
 			entity->body_id = b2CreateBody(state->world_id, &body_def);
-			b2CreateCircleShape(entity->body_id, &shape_def, &circle);
+		 	b2CreateCircleShape(entity->body_id, &shape_def, &circle);
 		}
 	}
 
@@ -245,8 +255,7 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		balls_shape_def_clutter.filter.categoryBits = COLLISION_FILTER_CLUTTER_SENSOR;
 		balls_shape_def_clutter.filter.maskBits     = COLLISION_FILTER_GROUND;
 		
-		b2Polygon polygon_circle = b2MakeBox(0.5f, 0.5f);
-		for(int i = 0; i < 8; ++i)
+		for(int i = 0; i < 1; ++i)
 		{
 			E04_Entity* ball_entity = new E04_Entity();
 			entity_create(state, ball_entity);
@@ -266,6 +275,8 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 			b2ShapeId col_id = b2CreateCircleShape(ball_entity->body_id, &balls_shape_def, &ball_circle);
 			b2Shape_SetRestitution(col_id, 0.8);
 
+			state->ball_shape_ids.push_back(col_id); // ADD SHAPE FOR RAY CHECKING
+
 			b2ShapeId id = b2CreateCircleShape(ball_entity->body_id, &balls_shape_def_clutter, &ball_circle);
 			itu_lib_sprite_init(
 				&ball_entity->sprite,
@@ -273,8 +284,13 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 				itu_lib_sprite_get_source_rect(3, 8, 16, 16)
 			);
 			b2Vec2 impulse = b2Vec2 { 100 - SDL_randf() * 200 ,  100 - SDL_randf() * 200  };
+			auto circle = b2Shape_GetCircle(col_id);
 			
 			b2Body_ApplyLinearImpulse(ball_entity->body_id, impulse, balls_body_def.position, true);
+		}
+		for(auto shape : state->ball_shape_ids){
+			b2Circle circle =  b2Shape_GetCircle(shape);
+
 		}
 
 	}
@@ -341,6 +357,10 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		entity_right->body_id = b2CreateBody(state->world_id, &body_def_right);
 		b2CreatePolygonShape(entity_right->body_id, &shape_def_right, &polygon_right);
 
+	}
+	for(auto shape : state->ball_shape_ids){
+			b2Circle circle =  b2Shape_GetCircle(shape);
+			
 	}
 
 
@@ -413,15 +433,47 @@ static void game_update(EngineContext* context, E04_GameState* state)
 				//SDL_Log("DYNAMIC");
 				vec2f force = VEC2F_ZERO;
 				vec2f impulse = VEC2F_ZERO;
-				if(data->grounded)
-				{
-					if(context->btn_isdown[BTN_TYPE_LEFT])
-						force.x = -player_dynamic_mov_force;
-					if(context->btn_isdown[BTN_TYPE_RIGHT])
-						force.x = player_dynamic_mov_force;
-					if(context->btn_isdown[BTN_TYPE_SPACE])
-						impulse.y = player_dynamic_jump_impulse;
+
+				if(context->btn_isjustpressed_action0){
+					// has set first position?
+					if(data->started){
+						vec2f mouse_pos = itu_lib_context_point_screen_to_global(context, context->mouse_pos);
+						data->endClick = {mouse_pos.x, mouse_pos.y};
+						b2Vec2 norm = b2Normalize(data->endClick - data->startClick); 
+						
+						b2RayCastInput ray = {data->startClick, norm, 25};
+						
+						for (auto shapeID : state->ball_shape_ids)
+						{
+							b2Circle circle = b2Shape_GetCircle(shapeID);
+							circle.center = b2Body_GetPosition(b2Shape_GetBody(shapeID));
+							b2CastOutput output = b2RayCastCircle(&ray, &circle);
+							SDL_Log("RADIUS: %f", circle.radius);
+							SDL_Log("X: %f Y: %f", circle.center.x, circle.center.y);
+							SDL_Log("MOUSE X: %f Y: %f", data->endClick.x, data->endClick.y);
+							SDL_Log("%d, %f", output.hit, output.fraction, output.iterations);
+							
+							/* code */
+						}
+						
+
+						SDL_Log("RAY: X: %f, Y: %f", ray.translation.x, ray.translation.y);
+
+						//reset
+						data->started = false;
+					}
+					else{
+						vec2f mouse_pos = itu_lib_context_point_screen_to_global(context, context->mouse_pos);
+						data->startClick = {mouse_pos.x, mouse_pos.y};
+						data->started = true;
+					}
+					
 				}
+				if(context->btn_isjustpressed_action1){
+					data->started = false;
+				}
+						
+				
 
 				b2Body_ApplyForceToCenter(player->body_id, value_cast(b2Vec2, force), true);
 				b2Body_ApplyLinearImpulseToCenter(player->body_id, value_cast(b2Vec2, impulse), true);
@@ -431,28 +483,6 @@ static void game_update(EngineContext* context, E04_GameState* state)
 			{
 				//SDL_Log("KINEMATIC");
 				vec2f velocity = player->velocity;
-				if(data->grounded)
-				{
-					if(context->btn_isdown[BTN_TYPE_LEFT])
-						velocity.x = -data->v_x;
-					else if(context->btn_isdown[BTN_TYPE_RIGHT])
-						velocity.x = data->v_x;
-					else
-						velocity.x = 0;
-
-					if(context->btn_isjustpressed[BTN_TYPE_SPACE])
-					{
-						compute_jump_parameters(data);
-						velocity.y = state->player_data.v_0;
-					}
-				}
-				else
-				{
-					if(velocity.y > 0)
-						velocity.y += state->player_data.g * context->delta;
-					else
-						velocity.y += state->player_data.g * context->delta * 3;
-				}
 
 				b2Body_SetLinearVelocity(player->body_id, value_cast(b2Vec2, velocity));
 				break;
@@ -499,14 +529,6 @@ static void game_update(EngineContext* context, E04_GameState* state)
 		}
 		int actual_contacts = b2Body_GetContactData(state->player->body_id, contact_data, contacts);
 
-		data->grounded = false;
-		for(int i = 0; i < actual_contacts; ++i)
-		{
-			b2Filter filter_a = b2Shape_GetFilter(contact_data[i].shapeIdA);
-			b2Filter filter_b = b2Shape_GetFilter(contact_data[i].shapeIdB);
-			if(filter_a.categoryBits & COLLISION_FILTER_GROUND)
-				data->grounded = true;
-		}
 	}
 	b2ContactEvents contact_events = b2World_GetContactEvents(state->world_id);
 	
