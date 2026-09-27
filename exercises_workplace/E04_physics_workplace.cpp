@@ -11,13 +11,14 @@ using namespace std;
 using namespace std;
 #include <map>
 
-
+const bool player = false;
 const int ENTITY_COUNT = 1024;
 
 const int COLLISION_FILTER_PLAYER         = 0b00001;
 const int COLLISION_FILTER_GROUND         = 0b00010;
 const int COLLISION_FILTER_CLUTTER        = 0b00100;
 const int COLLISION_FILTER_CLUTTER_SENSOR = 0b01000;
+const int COLLISION_FILTER_HOLE			  = 0b10000;
 const float GRAVITY      = -0.0f;
 bool DEBUG_render_textures = true;
 bool DEBUG_render_outlines = false;
@@ -188,13 +189,14 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		state->player = entity;
 		entity->transform.position = VEC2F_ZERO;
 		entity->transform.scale = VEC2F_ONE;
+		#if player
 		itu_lib_sprite_init(
 			&entity->sprite,
 			state->atlas,
 			itu_lib_sprite_get_source_rect(0, 9, 16, 16)
 		);
+		#endif
 		entity->sprite.pivot.y = 0;
-
 		// box2d body, shape and polygon
 		{
 			vec2f size = itu_lib_sprite_get_world_size(context, &entity->sprite, &entity->transform);
@@ -204,7 +206,6 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 			body_def.type = b2_dynamicBody;
 			body_def.fixedRotation = true;
 			body_def.position = b2Vec2{ 0, 0 };
-
 			b2ShapeDef shape_def = b2DefaultShapeDef();
 			shape_def.density = 1; // NOTE: default density of 0 will mess with collisions and gravity!
 			shape_def.enableSensorEvents  = true;
@@ -217,17 +218,14 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 			circle.radius = 0.5f;
 			circle.center = value_cast(b2Vec2, offset);
 			entity->body_id = b2CreateBody(state->world_id, &body_def);
+			#if player
 		 	b2CreateCircleShape(entity->body_id, &shape_def, &circle);
+			#endif
 		}
 	}
 
 
-	// Holes
-	{
-
-
-
-	}
+	
 
 	//Balls
 	{
@@ -281,7 +279,7 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 			itu_lib_sprite_init(
 				&ball_entity->sprite,
 				state->atlas,
-				itu_lib_sprite_get_source_rect(3, 8, 16, 16)
+				itu_lib_sprite_get_source_rect(0 + SDL_rand(5), 7 + SDL_rand(4), 16, 16)
 			);
 			b2Vec2 impulse = b2Vec2 { 100 - SDL_randf() * 200 ,  100 - SDL_randf() * 200  };
 			auto circle = b2Shape_GetCircle(col_id);
@@ -357,7 +355,49 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		entity_right->body_id = b2CreateBody(state->world_id, &body_def_right);
 		b2CreatePolygonShape(entity_right->body_id, &shape_def_right, &polygon_right);
 
+		// Holes
+		{
+			b2BodyDef hole_body_def = b2DefaultBodyDef();
+			hole_body_def.type = b2_staticBody;
+			
+			b2ShapeDef hole_shape_def = b2DefaultShapeDef();
+			hole_shape_def.isSensor = true;
+			hole_shape_def.enableSensorEvents = true;
+			hole_shape_def.filter.categoryBits = COLLISION_FILTER_HOLE;
+			hole_shape_def.filter.maskBits     = COLLISION_FILTER_CLUTTER;
+			for (int i = 0; i < 2; ++i){
+				for (int j = 0; j < 2; ++j){
+				
+					E04_Entity* hole_entity = new E04_Entity();
+					entity_create(state, hole_entity);
+					hole_entity->transform.scale = vec2f{2, 2};
+					hole_entity->transform.rotation = 0;
+
+					vec2f size = itu_lib_sprite_get_world_size(context, &hole_entity->sprite, &hole_entity->transform);
+					vec2f offset = -mul_element_wise(size, hole_entity->sprite.pivot - vec2f{ 0.5f, 0.5f });
+
+					b2Circle ball_circle;
+					ball_circle.radius = 1.0f;
+					ball_circle.center = value_cast(b2Vec2, offset);
+					hole_body_def.position = b2Vec2{ 
+						(-8.0f + ball_circle.radius) + i * (16 - ball_circle.radius * 2) , 
+						(-6.0f + ball_circle.radius) + j * (12 - ball_circle.radius * 2)};
+					hole_entity->body_id = b2CreateBody(state->world_id, &hole_body_def);
+
+					b2ShapeId col_id = b2CreateCircleShape(hole_entity->body_id, &hole_shape_def, &ball_circle);
+
+					itu_lib_sprite_init(
+						&hole_entity->sprite,
+						state->atlas,
+						itu_lib_sprite_get_source_rect(7, 7, 16, 16)
+					);				
+				}
+			}
+		}
+
 	}
+
+	
 	for(auto shape : state->ball_shape_ids){
 			b2Circle circle =  b2Shape_GetCircle(shape);
 			
@@ -423,17 +463,12 @@ static void game_update(EngineContext* context, E04_GameState* state)
 
 	// player
 	{
-		E04_Entity* player = state->player;
 		E04_PlayerData* data = &state->player_data;
 
 		switch(DEBUG_simulation_type_current)
 		{
 			case SIMULATION_TYPE_DYNAMIC:
 			{
-				//SDL_Log("DYNAMIC");
-				vec2f force = VEC2F_ZERO;
-				vec2f impulse = VEC2F_ZERO;
-
 				if(context->btn_isjustpressed_action0){
 					// has set first position?
 					if(data->started){
@@ -441,15 +476,13 @@ static void game_update(EngineContext* context, E04_GameState* state)
 						data->endClick = {mouse_pos.x, mouse_pos.y};
 						b2Vec2 norm = b2Normalize(data->endClick - data->startClick); 
 
-						
 						b2RayCastInput ray = {data->startClick, norm, 25};
 						
 						b2ShapeId cur_shape; // chosen shape to shoot
+						cur_shape.index1 = -1;
 						b2CastOutput cur_output;
 
 						float min_distance = FLOAT_MAX_VAL;
-
-
 						for (auto shapeID : state->ball_shape_ids)
 						{
 							b2Circle circle = b2Shape_GetCircle(shapeID);
@@ -466,17 +499,11 @@ static void game_update(EngineContext* context, E04_GameState* state)
 							SDL_Log("X: %f Y: %f", circle.center.x, circle.center.y);
 							SDL_Log("MOUSE X: %f Y: %f", data->endClick.x, data->endClick.y);
 							SDL_Log("%d, %f", output.hit, output.fraction, output.iterations);
-							
-							//b2Body_ApplyLinearImpulse(b2Shape_GetBody(shapeID), norm * b2Distance(data->startClick, data->endClick), output.point, true);
-							/* code */
 						}
-						if(cur_shape.index1 != NULL){
+						if(cur_shape.index1 != -1){
 							b2Body_ApplyLinearImpulse(b2Shape_GetBody(cur_shape), norm * b2Distance(data->startClick, data->endClick), cur_output.point, true);
-
-
 						}
-						
-
+					
 						SDL_Log("RAY: X: %f, Y: %f", ray.translation.x, ray.translation.y);
 
 						//reset
@@ -487,24 +514,10 @@ static void game_update(EngineContext* context, E04_GameState* state)
 						data->startClick = {mouse_pos.x, mouse_pos.y};
 						data->started = true;
 					}
-					
 				}
 				if(context->btn_isjustpressed_action1){
 					data->started = false;
 				}
-						
-				
-
-				b2Body_ApplyForceToCenter(player->body_id, value_cast(b2Vec2, force), true);
-				b2Body_ApplyLinearImpulseToCenter(player->body_id, value_cast(b2Vec2, impulse), true);
-				break;
-			}
-			case SIMULATION_TYPE_KINEMATIC:
-			{
-				//SDL_Log("KINEMATIC");
-				vec2f velocity = player->velocity;
-
-				b2Body_SetLinearVelocity(player->body_id, value_cast(b2Vec2, velocity));
 				break;
 			}
 		}
@@ -529,31 +542,6 @@ static void game_update(EngineContext* context, E04_GameState* state)
 		entity->transform.position = value_cast(vec2f, physics_pos);
 		entity->transform.rotation = b2Rot_GetAngle(physics_rot);
 	}
-
-	// player
-	{
-		E04_Entity* entity = state->player;
-		E04_PlayerData* data = &state->player_data;
-
-
-		// NOTE: quick hack because I forgot a VLA in the code again. Exercise solution will do this nicely
-		static int contad_data_size = 16;
-		static b2ContactData* contact_data = (b2ContactData*)SDL_calloc(16, sizeof(b2ContactData));
-
-		int contacts = b2Body_GetContactCapacity(entity->body_id);
-
-		if(contacts > contad_data_size)
-		{
-			contad_data_size = contacts;
-			contact_data = (b2ContactData*)SDL_realloc(contact_data, contad_data_size * sizeof(b2ContactData));
-		}
-		int actual_contacts = b2Body_GetContactData(state->player->body_id, contact_data, contacts);
-
-	}
-	b2ContactEvents contact_events = b2World_GetContactEvents(state->world_id);
-	
-	b2ContactHitEvent * hitevents = contact_events.hitEvents;
-
 
 	// world
 
@@ -655,34 +643,8 @@ int main(void)
 			if(ImGui::Combo("Simulation type", &DEBUG_simulation_type_current, DEBUG_simulation_types, array_size(DEBUG_simulation_types)))
 				// reset simulation on type change
 				game_reset(&context, &state);
-			b2Vec2 player_pos_physics = b2Body_GetPosition(state.player->body_id);
-			ImGui::LabelText("player pos game ", "%4.2f   %4.2f", state.player->transform.position.x, state.player->transform.position.y);
-			ImGui::LabelText("player pos box2d", "%4.2f   %4.2f", player_pos_physics.x, player_pos_physics.y);
-			b2Vec2 velocity = b2Body_GetLinearVelocity(state.player->body_id);
-			ImGui::LabelText("player velocity", "%4.2f   %4.2f", velocity.x, velocity.y);
 
-			ImGui::SeparatorText("Simulation type params");
-			switch(DEBUG_simulation_type_current)
-			{
-				case SIMULATION_TYPE_DYNAMIC:
-				{
-					if(ImGui::DragFloat("gravity", &player_dynamic_gravity))
-						b2World_SetGravity(state.world_id, b2Vec2 { 0, player_dynamic_gravity });
-					ImGui::DragFloat("jump impulse", &player_dynamic_jump_impulse);
-					ImGui::DragFloat("mov force", &player_dynamic_mov_force);
-					break;
-				}
-				case SIMULATION_TYPE_KINEMATIC:
-				{
-					ImGui::DragFloat("horizontal velocity", &state.player_data.v_x);
-					ImGui::DragFloat("jump height", &state.player_data.h);
-					ImGui::DragFloat("jump distance", &state.player_data.x_h);
-					ImGui::LabelText("jump gravity", "%4.2f", state.player_data.g);
-					ImGui::LabelText("jump initial vertical velocity", "%4.2f", state.player_data.v_0);
-					break;
-				}
-			}
-
+			
 			ImGui::SeparatorText("Debug");
 			if(ImGui::Button("[TAB] reset"))
 				game_reset(&context, &state);
