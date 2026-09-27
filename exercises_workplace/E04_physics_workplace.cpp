@@ -512,62 +512,8 @@ static void game_update(EngineContext* context, E04_GameState* state)
 	
 	b2ContactHitEvent * hitevents = contact_events.hitEvents;
 
-	
-
-	for(int i = 0; i < contact_events.hitCount; ++i)
-	{
-		
-		b2ContactHitEvent * event = &hitevents[i];
-		
-		SDL_Log("HIT");
-		b2Filter filter_a = b2Shape_GetFilter(event->shapeIdA);
-		b2Filter filter_b = b2Shape_GetFilter(event->shapeIdB);
-
-		b2Vec2 hitVel = event->approachSpeed * event->normal;
-		SDL_Log("%f, %f", hitVel.x, hitVel.y);
-
-		if(filter_a.categoryBits & COLLISION_FILTER_GROUND) {
-			SDL_Log("HIT GROUND");
-			if (filter_b.categoryBits & COLLISION_FILTER_CLUTTER) {
-				SDL_Log("HIT BY BALL");
-
-				b2Vec2 direction = b2Vec2 { 0, 1 };
-				float spread = state->player_data.grounded ? PI / 4 : TAU;
-				b2Vec2 impulse = b2Vec2 { 5 - SDL_randf() * 10 ,  5 - SDL_randf() * 10  };
-				
-				b2BodyId body = b2Shape_GetBody(event->shapeIdB);
-				b2Vec2 velocity = b2Body_GetLinearVelocity(body);
-				SDL_Log("VELOCITY: X:  %f. Y: %f", velocity.x, velocity.y);
-				//b2Body_ApplyLinearImpulseToCenter(body, {hitVel.x * 0.5, hitVel.y * 0.5}, true);
-
-
-			}
-		}
-
-	}
-
 
 	// world
-	b2SensorEvents worl_sensor_events = b2World_GetSensorEvents(state->world_id);
-	for(int i = 0; i < worl_sensor_events.beginCount; ++i)
-	{
-		b2SensorBeginTouchEvent* sensor_event = &worl_sensor_events.beginEvents[i];
-		b2Vec2 direction = b2Vec2 { 0, 1 };
-
-		SDL_Log("%i", sensor_event->sensorShapeId.index1);
-		SDL_Log("%i", sensor_event->visitorShapeId.index1);
-
-
-		float vel_sq = length_sq(state->player->velocity);
-		if(SDL_fabsf(vel_sq) < FLOAT_EPSILON)
-			// apply impulse only if the player is moving
-			// (boxes falling on player when it's not moving feel unnatural)
-			continue;
-
-		float amount = SDL_clamp(length_sq(state->player->velocity) * 2, 5, 15);
-		float spread = state->player_data.grounded ? PI / 4 : TAU;
-		clutter_apply_impulse_random(sensor_event->sensorShapeId, direction, amount, spread);
-	}
 
 	{
 		const float zoom_speed = 1;
