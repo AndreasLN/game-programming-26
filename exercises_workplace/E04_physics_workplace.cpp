@@ -440,6 +440,7 @@ static void game_update(EngineContext* context, E04_GameState* state)
 						vec2f mouse_pos = itu_lib_context_point_screen_to_global(context, context->mouse_pos);
 						data->endClick = {mouse_pos.x, mouse_pos.y};
 						b2Vec2 norm = b2Normalize(data->endClick - data->startClick); 
+
 						
 						b2RayCastInput ray = {data->startClick, norm, 25};
 						
@@ -453,6 +454,7 @@ static void game_update(EngineContext* context, E04_GameState* state)
 							SDL_Log("MOUSE X: %f Y: %f", data->endClick.x, data->endClick.y);
 							SDL_Log("%d, %f", output.hit, output.fraction, output.iterations);
 							
+							b2Body_ApplyLinearImpulse(b2Shape_GetBody(shapeID), norm * b2Distance(data->startClick, data->endClick), output.point, true);
 							/* code */
 						}
 						
