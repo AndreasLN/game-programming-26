@@ -71,7 +71,7 @@ struct E04_GameState
 	E04_Entity* player;
 
 	// game-allocated memory
-	E04_Entity* entities;
+	list<E04_Entity*> entities;
 	int entities_alive_count;
 	E04_PlayerData player_data;
 
@@ -82,18 +82,18 @@ struct E04_GameState
 	b2WorldId world_id;
 };
 
-static E04_Entity* entity_create(E04_GameState* state)
+static void entity_create(E04_GameState* state, E04_Entity * entity)
 {
 	if(!(state->entities_alive_count < ENTITY_COUNT))
 		// NOTE: this might as well be an assert, if we don't have a way to recover/handle it
-		return NULL;
+		return;
 
 	// // concise version
 	//return &state->entities[state->entities_alive_count++];
 
-	E04_Entity* ret = &state->entities[state->entities_alive_count];
+	state->entities.push_back(entity);
 	++state->entities_alive_count;
-	return ret;
+	return;
 }
 
 // NOTE: this only works if nobody holds references to other entities!
@@ -102,10 +102,9 @@ static E04_Entity* entity_create(E04_GameState* state)
 static void entity_destroy(E04_GameState* state, E04_Entity* entity)
 {
 	// NOTE: here we want to fail hard, nobody should pass us a pointer not gotten from `entity_create()`
-	SDL_assert(entity < state->entities || entity > state->entities + ENTITY_COUNT);
 
+	state->entities.remove(entity);
 	--state->entities_alive_count;
-	*entity = state->entities[state->entities_alive_count];
 }
 
 void compute_jump_parameters(E04_PlayerData* data)
@@ -142,8 +141,7 @@ static void game_init(EngineContext* context, E04_GameState* state)
 	itu_lib_input_set_mapping_keyboard(context, SDLK_TAB, BTN_TYPE_DEBUG_RESET);
 
 	// allocate memory
-	state->entities = (E04_Entity*)SDL_calloc(ENTITY_COUNT, sizeof(E04_Entity));
-	SDL_assert(state->entities);
+	state->entities = {};
 
 	state->world_id = { 0 };
 
@@ -174,7 +172,8 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 
 	// player
 	{
-		E04_Entity* entity = entity_create(state);
+		E04_Entity* entity = new E04_Entity();
+		entity_create(state, entity);
 		state->player = entity;
 		entity->transform.position = VEC2F_ZERO;
 		entity->transform.scale = VEC2F_ONE;
@@ -229,6 +228,7 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		b2ShapeDef balls_shape_def = b2DefaultShapeDef();
 		balls_shape_def.density = 1;
 		balls_shape_def.enableHitEvents = true;
+		//balls_shape_def.isSensor = true;
 		balls_shape_def.filter.categoryBits = COLLISION_FILTER_CLUTTER;
 		balls_shape_def.filter.maskBits     = COLLISION_FILTER_GROUND;
 
@@ -244,7 +244,8 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		b2Polygon polygon_circle = b2MakeBox(0.5f, 0.5f);
 		for(int i = 0; i < 1; ++i)
 		{
-			E04_Entity* ball_entity = entity_create(state);
+			E04_Entity* ball_entity = new E04_Entity();
+			entity_create(state, ball_entity);
 			ball_entity->transform.scale = VEC2F_ONE;
 
 			vec2f size = itu_lib_sprite_get_world_size(context, &ball_entity->sprite, &ball_entity->transform);
@@ -284,7 +285,8 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		shape_def_bottom.filter.categoryBits = COLLISION_FILTER_GROUND;
 		b2Polygon polygon_bottom = b2MakeBox(8.0f, 1.0f);
 
-		E04_Entity* entity_bottom = entity_create(state);
+		E04_Entity* entity_bottom = new E04_Entity();
+		entity_create(state, entity_bottom);
 		entity_bottom->body_id = b2CreateBody(state->world_id, &body_def_bottom);
 		b2CreatePolygonShape(entity_bottom->body_id, &shape_def_bottom, &polygon_bottom);
 
@@ -295,10 +297,12 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		b2ShapeDef shape_def_top = b2DefaultShapeDef();
 
 		shape_def_top.filter.categoryBits = COLLISION_FILTER_GROUND;
+		shape_def_top.filter.maskBits = COLLISION_FILTER_CLUTTER | COLLISION_FILTER_CLUTTER_SENSOR;
 
 		b2Polygon polygon_top = b2MakeBox(8.0f, 1.0f);
 
-		E04_Entity* entity_top = entity_create(state);
+		E04_Entity* entity_top = new E04_Entity(); 
+		entity_create(state, entity_top);
 		entity_top->body_id = b2CreateBody(state->world_id, &body_def_top);
 		b2CreatePolygonShape(entity_top->body_id, &shape_def_top, &polygon_top);
 
@@ -309,10 +313,12 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		b2ShapeDef shape_def_left = b2DefaultShapeDef();
 
 		shape_def_left.filter.categoryBits = COLLISION_FILTER_GROUND;
+		shape_def_left.filter.maskBits = COLLISION_FILTER_CLUTTER | COLLISION_FILTER_CLUTTER_SENSOR;
 
 		b2Polygon polygon_left = b2MakeBox(1.0f, 8.0f);
 
-		E04_Entity* entity_left = entity_create(state);
+		E04_Entity* entity_left = new E04_Entity(); 
+		entity_create(state, entity_left);
 		entity_left->body_id = b2CreateBody(state->world_id, &body_def_left);
 		b2CreatePolygonShape(entity_left->body_id, &shape_def_left, &polygon_left);
 
@@ -325,11 +331,10 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		shape_def_right.filter.categoryBits = COLLISION_FILTER_GROUND;
 		b2Polygon polygon_right = b2MakeBox(1.0f, 8.0f);
 
-		E04_Entity* entity_right = entity_create(state);
+		E04_Entity* entity_right = new E04_Entity();
+		entity_create(state, entity_right);
 		entity_right->body_id = b2CreateBody(state->world_id, &body_def_right);
 		b2CreatePolygonShape(entity_right->body_id, &shape_def_right, &polygon_right);
-
-
 
 	}
 
@@ -456,9 +461,8 @@ static void game_update(EngineContext* context, E04_GameState* state)
 	b2World_Step(state->world_id, NS_TO_SECONDS(context->target_framerate_fixed_ns), 4);
 
 	// entities
-	for(int i = 0; i < state->entities_alive_count; ++i)
+	for(E04_Entity * entity : state->entities)
 	{
-		E04_Entity* entity = &state->entities[i];
 		b2Vec2 physics_vel = b2Body_GetLinearVelocity(entity->body_id);
 		b2Vec2 physics_pos = b2Body_GetPosition(entity->body_id);
 		b2Rot  physics_rot = b2Body_GetRotation(entity->body_id);
@@ -499,7 +503,7 @@ static void game_update(EngineContext* context, E04_GameState* state)
 	for(int i = 0; i < contact_events.beginCount; ++i)
 	{
 		b2ContactBeginTouchEvent * event = &contact_events.beginEvents[i];
-		//SDL_Log();
+		SDL_Log("AAAAHHHH");
 	}
 
 
@@ -543,9 +547,8 @@ static void game_render(EngineContext* context, E04_GameState* state)
 	if(context->btn_isjustpressed[BTN_TYPE_DEBUG_F3]) DEBUG_physics = !DEBUG_physics;
 
 	// entities
-	for(int i = 0; i < state->entities_alive_count; ++i)
+	for(auto entity : state->entities)
 	{
-		E04_Entity* entity = &state->entities[i];
 		// render texture
 		SDL_FRect rect_src = entity->sprite.rect;
 		SDL_FRect rect_dst;
