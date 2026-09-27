@@ -228,18 +228,21 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		// collider shape (to enable collisions with the ground)
 		b2ShapeDef balls_shape_def = b2DefaultShapeDef();
 		balls_shape_def.density = 1;
+		balls_shape_def.enableHitEvents = true;
 		balls_shape_def.filter.categoryBits = COLLISION_FILTER_CLUTTER;
+		balls_shape_def.filter.maskBits     = COLLISION_FILTER_GROUND;
 
 		// sensor shape (to enable interaction with the player)
 		b2ShapeDef balls_shape_def_clutter = b2DefaultShapeDef();
 		balls_shape_def_clutter.density = 0;
 		balls_shape_def_clutter.isSensor = true;
 		balls_shape_def_clutter.enableSensorEvents = true;
+		//balls_shape_def_clutter.enableHitEvents = true;
 		balls_shape_def_clutter.filter.categoryBits = COLLISION_FILTER_CLUTTER_SENSOR;
-		balls_shape_def_clutter.filter.maskBits     = COLLISION_FILTER_PLAYER;
+		balls_shape_def_clutter.filter.maskBits     = COLLISION_FILTER_GROUND;
 		
 		b2Polygon polygon_circle = b2MakeBox(0.5f, 0.5f);
-		for(int i = 0; i < 8; ++i)
+		for(int i = 0; i < 1; ++i)
 		{
 			E04_Entity* ball_entity = entity_create(state);
 			ball_entity->transform.scale = VEC2F_ONE;
@@ -255,12 +258,17 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 			balls_body_def.angularVelocity = 1;
 			ball_entity->body_id = b2CreateBody(state->world_id, &balls_body_def);
 			b2CreateCircleShape(ball_entity->body_id, &balls_shape_def, &ball_circle);
-			b2CreateCircleShape(ball_entity->body_id, &balls_shape_def_clutter, &ball_circle);
+			b2ShapeId id = b2CreateCircleShape(ball_entity->body_id, &balls_shape_def_clutter, &ball_circle);
 			itu_lib_sprite_init(
 				&ball_entity->sprite,
 				state->atlas,
 				itu_lib_sprite_get_source_rect(3, 8, 16, 16)
 			);
+			b2Vec2 impulse = b2Vec2 { 5 - SDL_randf() * 10 ,  5 - SDL_randf() * 10  };
+			float amount = SDL_clamp(8, 5, 15);
+			float spread = state->player_data.grounded ? PI / 4 : TAU;
+			b2Body_ApplyLinearImpulse(ball_entity->body_id, impulse, balls_body_def.position, false);
+			//clutter_apply_impulse_random(id, impulse, amount, spread);
 		}
 
 	}
@@ -287,6 +295,7 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		b2ShapeDef shape_def_top = b2DefaultShapeDef();
 
 		shape_def_top.filter.categoryBits = COLLISION_FILTER_GROUND;
+
 		b2Polygon polygon_top = b2MakeBox(8.0f, 1.0f);
 
 		E04_Entity* entity_top = entity_create(state);
@@ -300,6 +309,7 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		b2ShapeDef shape_def_left = b2DefaultShapeDef();
 
 		shape_def_left.filter.categoryBits = COLLISION_FILTER_GROUND;
+
 		b2Polygon polygon_left = b2MakeBox(1.0f, 8.0f);
 
 		E04_Entity* entity_left = entity_create(state);
@@ -389,6 +399,7 @@ static void game_update(EngineContext* context, E04_GameState* state)
 		{
 			case SIMULATION_TYPE_DYNAMIC:
 			{
+				//SDL_Log("DYNAMIC");
 				vec2f force = VEC2F_ZERO;
 				vec2f impulse = VEC2F_ZERO;
 				if(data->grounded)
@@ -407,6 +418,7 @@ static void game_update(EngineContext* context, E04_GameState* state)
 			}
 			case SIMULATION_TYPE_KINEMATIC:
 			{
+				//SDL_Log("KINEMATIC");
 				vec2f velocity = player->velocity;
 				if(data->grounded)
 				{
@@ -483,6 +495,13 @@ static void game_update(EngineContext* context, E04_GameState* state)
 				data->grounded = true;
 		}
 	}
+	b2ContactEvents contact_events = b2World_GetContactEvents(state->world_id);
+	for(int i = 0; i < contact_events.beginCount; ++i)
+	{
+		b2ContactBeginTouchEvent * event = &contact_events.beginEvents[i];
+		//SDL_Log();
+	}
+
 
 	// world
 	b2SensorEvents worl_sensor_events = b2World_GetSensorEvents(state->world_id);
@@ -490,6 +509,10 @@ static void game_update(EngineContext* context, E04_GameState* state)
 	{
 		b2SensorBeginTouchEvent* sensor_event = &worl_sensor_events.beginEvents[i];
 		b2Vec2 direction = b2Vec2 { 0, 1 };
+
+		SDL_Log("%i", sensor_event->sensorShapeId.index1);
+		SDL_Log("%i", sensor_event->visitorShapeId.index1);
+
 
 		float vel_sq = length_sq(state->player->velocity);
 		if(SDL_fabsf(vel_sq) < FLOAT_EPSILON)
