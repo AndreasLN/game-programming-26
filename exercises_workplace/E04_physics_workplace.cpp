@@ -255,7 +255,7 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		balls_shape_def_clutter.filter.categoryBits = COLLISION_FILTER_CLUTTER_SENSOR;
 		balls_shape_def_clutter.filter.maskBits     = COLLISION_FILTER_GROUND;
 		
-		for(int i = 0; i < 1; ++i)
+		for(int i = 0; i < 8; ++i)
 		{
 			E04_Entity* ball_entity = new E04_Entity();
 			entity_create(state, ball_entity);
@@ -444,18 +444,36 @@ static void game_update(EngineContext* context, E04_GameState* state)
 						
 						b2RayCastInput ray = {data->startClick, norm, 25};
 						
+						b2ShapeId cur_shape; // chosen shape to shoot
+						b2CastOutput cur_output;
+
+						float min_distance = FLOAT_MAX_VAL;
+
+
 						for (auto shapeID : state->ball_shape_ids)
 						{
 							b2Circle circle = b2Shape_GetCircle(shapeID);
 							circle.center = b2Body_GetPosition(b2Shape_GetBody(shapeID));
 							b2CastOutput output = b2RayCastCircle(&ray, &circle);
+							if(output.hit){
+								if(b2Distance(data->startClick, circle.center) < min_distance){
+									min_distance = b2Distance(data->startClick, circle.center);
+									cur_shape = shapeID;
+									cur_output = output;
+								}
+							}
 							SDL_Log("RADIUS: %f", circle.radius);
 							SDL_Log("X: %f Y: %f", circle.center.x, circle.center.y);
 							SDL_Log("MOUSE X: %f Y: %f", data->endClick.x, data->endClick.y);
 							SDL_Log("%d, %f", output.hit, output.fraction, output.iterations);
 							
-							b2Body_ApplyLinearImpulse(b2Shape_GetBody(shapeID), norm * b2Distance(data->startClick, data->endClick), output.point, true);
+							//b2Body_ApplyLinearImpulse(b2Shape_GetBody(shapeID), norm * b2Distance(data->startClick, data->endClick), output.point, true);
 							/* code */
+						}
+						if(cur_shape.index1 != NULL){
+							b2Body_ApplyLinearImpulse(b2Shape_GetBody(cur_shape), norm * b2Distance(data->startClick, data->endClick), cur_output.point, true);
+
+
 						}
 						
 
