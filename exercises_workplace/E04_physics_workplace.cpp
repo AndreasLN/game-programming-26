@@ -167,6 +167,7 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		? GRAVITY
 		: player_dynamic_gravity;
 	state->world_id = b2CreateWorld(&def_world);
+	b2World_SetHitEventThreshold(state->world_id, 0);
 
 	state->entities_alive_count = 0;
 
@@ -228,7 +229,7 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		b2ShapeDef balls_shape_def = b2DefaultShapeDef();
 		balls_shape_def.density = 1;
 		balls_shape_def.enableHitEvents = true;
-		//balls_shape_def.isSensor = true;
+		balls_shape_def.enableContactEvents = true;
 		balls_shape_def.filter.categoryBits = COLLISION_FILTER_CLUTTER;
 		balls_shape_def.filter.maskBits     = COLLISION_FILTER_GROUND;
 
@@ -237,7 +238,7 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		balls_shape_def_clutter.density = 0;
 		balls_shape_def_clutter.isSensor = true;
 		balls_shape_def_clutter.enableSensorEvents = true;
-		//balls_shape_def_clutter.enableHitEvents = true;
+		balls_shape_def_clutter.enableHitEvents = true;
 		balls_shape_def_clutter.filter.categoryBits = COLLISION_FILTER_CLUTTER_SENSOR;
 		balls_shape_def_clutter.filter.maskBits     = COLLISION_FILTER_GROUND;
 		
@@ -268,7 +269,11 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 			b2Vec2 impulse = b2Vec2 { 5 - SDL_randf() * 10 ,  5 - SDL_randf() * 10  };
 			float amount = SDL_clamp(8, 5, 15);
 			float spread = state->player_data.grounded ? PI / 4 : TAU;
-			b2Body_ApplyLinearImpulse(ball_entity->body_id, impulse, balls_body_def.position, false);
+			b2Body_ApplyLinearImpulse(ball_entity->body_id, impulse, balls_body_def.position, true);
+			b2Vec2 worldvel = b2Body_GetWorldPointVelocity(ball_entity->body_id, b2Body_GetWorldCenterOfMass(ball_entity->body_id));
+			b2Vec2 vel = b2Body_GetLinearVelocity(ball_entity->body_id);
+			SDL_Log("WORLD VEL: X: %f, Y: %f", worldvel.x, worldvel.y);
+			SDL_Log("VEL: X: %f, Y: %f", vel.x, vel.y);
 			//clutter_apply_impulse_random(id, impulse, amount, spread);
 		}
 
@@ -362,7 +367,8 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		b2Polygon polygon_box = b2MakeBox(0.5f, 0.5f);
 		for(int i = 0; i < 32; ++i)
 		{
-			E04_Entity* entity = entity_create(state);
+			E04_Entity* entity = new E04_Entity();
+			entity_create(state, entity);
 			entity->transform.scale = VEC2F_ONE;
 
 			vec2f size = itu_lib_sprite_get_world_size(context, &entity->sprite, &entity->transform);
@@ -500,10 +506,43 @@ static void game_update(EngineContext* context, E04_GameState* state)
 		}
 	}
 	b2ContactEvents contact_events = b2World_GetContactEvents(state->world_id);
-	for(int i = 0; i < contact_events.beginCount; ++i)
+	
+	b2ContactHitEvent * hitevents = contact_events.hitEvents;
+
+	
+
+	for(int i = 0; i < contact_events.hitCount; ++i)
 	{
-		b2ContactBeginTouchEvent * event = &contact_events.beginEvents[i];
-		SDL_Log("AAAAHHHH");
+		
+		b2ContactHitEvent * event = &hitevents[i];
+		
+		SDL_Log("HIT");
+		b2Filter filter_a = b2Shape_GetFilter(event->shapeIdA);
+		b2Filter filter_b = b2Shape_GetFilter(event->shapeIdB);
+
+		b2Vec2 hitVel = event->approachSpeed * event->normal;
+		SDL_Log("%f, %f", hitVel.x, hitVel.y);
+
+		if(filter_a.categoryBits & COLLISION_FILTER_GROUND) {
+			SDL_Log("HIT GROUND");
+			if (filter_b.categoryBits & COLLISION_FILTER_CLUTTER) {
+				SDL_Log("HIT BY BALL");
+
+				b2Vec2 direction = b2Vec2 { 0, 1 };
+				float spread = state->player_data.grounded ? PI / 4 : TAU;
+				b2Vec2 impulse = b2Vec2 { 5 - SDL_randf() * 10 ,  5 - SDL_randf() * 10  };
+				
+				b2BodyId body = b2Shape_GetBody(event->shapeIdB);
+				b2Vec2 velocity = b2Body_GetLinearVelocity(body);
+				SDL_Log("VELOCITY: X:  %f. Y: %f", velocity.x, velocity.y);
+				velocity = b2Body_GetLinearVelocity(body);
+				b2Body_ApplyLinearImpulseToCenter(body, {hitVel.x * 0.5, hitVel.y * 0.5}, true);
+				
+				SDL_Log("NEW VELOCITY: X:  %f. Y: %f", velocity.x, velocity.y);
+
+			}
+		}
+
 	}
 
 
