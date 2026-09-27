@@ -224,6 +224,8 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		b2BodyDef balls_body_def = b2DefaultBodyDef();
 		balls_body_def.type = b2_dynamicBody;
 		balls_body_def.fixedRotation = false;
+		balls_body_def.linearDamping = 0.1;
+		balls_body_def.angularDamping = 0.1;
 
 		// collider shape (to enable collisions with the ground)
 		b2ShapeDef balls_shape_def = b2DefaultShapeDef();
@@ -231,7 +233,8 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		balls_shape_def.enableHitEvents = true;
 		balls_shape_def.enableContactEvents = true;
 		balls_shape_def.filter.categoryBits = COLLISION_FILTER_CLUTTER;
-		balls_shape_def.filter.maskBits     = COLLISION_FILTER_GROUND;
+		balls_shape_def.filter.maskBits     = COLLISION_FILTER_GROUND | COLLISION_FILTER_CLUTTER;
+
 
 		// sensor shape (to enable interaction with the player)
 		b2ShapeDef balls_shape_def_clutter = b2DefaultShapeDef();
@@ -243,7 +246,7 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 		balls_shape_def_clutter.filter.maskBits     = COLLISION_FILTER_GROUND;
 		
 		b2Polygon polygon_circle = b2MakeBox(0.5f, 0.5f);
-		for(int i = 0; i < 1; ++i)
+		for(int i = 0; i < 8; ++i)
 		{
 			E04_Entity* ball_entity = new E04_Entity();
 			entity_create(state, ball_entity);
@@ -259,22 +262,19 @@ static void game_reset(EngineContext* context, E04_GameState* state)
 			balls_body_def.rotation = b2MakeRot(SDL_randf() * TAU);
 			balls_body_def.angularVelocity = 1;
 			ball_entity->body_id = b2CreateBody(state->world_id, &balls_body_def);
-			b2CreateCircleShape(ball_entity->body_id, &balls_shape_def, &ball_circle);
+
+			b2ShapeId col_id = b2CreateCircleShape(ball_entity->body_id, &balls_shape_def, &ball_circle);
+			b2Shape_SetRestitution(col_id, 0.8);
+
 			b2ShapeId id = b2CreateCircleShape(ball_entity->body_id, &balls_shape_def_clutter, &ball_circle);
 			itu_lib_sprite_init(
 				&ball_entity->sprite,
 				state->atlas,
 				itu_lib_sprite_get_source_rect(3, 8, 16, 16)
 			);
-			b2Vec2 impulse = b2Vec2 { 5 - SDL_randf() * 10 ,  5 - SDL_randf() * 10  };
-			float amount = SDL_clamp(8, 5, 15);
-			float spread = state->player_data.grounded ? PI / 4 : TAU;
+			b2Vec2 impulse = b2Vec2 { 100 - SDL_randf() * 200 ,  100 - SDL_randf() * 200  };
+			
 			b2Body_ApplyLinearImpulse(ball_entity->body_id, impulse, balls_body_def.position, true);
-			b2Vec2 worldvel = b2Body_GetWorldPointVelocity(ball_entity->body_id, b2Body_GetWorldCenterOfMass(ball_entity->body_id));
-			b2Vec2 vel = b2Body_GetLinearVelocity(ball_entity->body_id);
-			SDL_Log("WORLD VEL: X: %f, Y: %f", worldvel.x, worldvel.y);
-			SDL_Log("VEL: X: %f, Y: %f", vel.x, vel.y);
-			//clutter_apply_impulse_random(id, impulse, amount, spread);
 		}
 
 	}
@@ -470,6 +470,9 @@ static void game_update(EngineContext* context, E04_GameState* state)
 	for(E04_Entity * entity : state->entities)
 	{
 		b2Vec2 physics_vel = b2Body_GetLinearVelocity(entity->body_id);
+
+		
+
 		b2Vec2 physics_pos = b2Body_GetPosition(entity->body_id);
 		b2Rot  physics_rot = b2Body_GetRotation(entity->body_id);
 		entity->velocity = value_cast(vec2f, physics_vel);
@@ -535,10 +538,8 @@ static void game_update(EngineContext* context, E04_GameState* state)
 				b2BodyId body = b2Shape_GetBody(event->shapeIdB);
 				b2Vec2 velocity = b2Body_GetLinearVelocity(body);
 				SDL_Log("VELOCITY: X:  %f. Y: %f", velocity.x, velocity.y);
-				velocity = b2Body_GetLinearVelocity(body);
-				b2Body_ApplyLinearImpulseToCenter(body, {hitVel.x * 0.5, hitVel.y * 0.5}, true);
-				
-				SDL_Log("NEW VELOCITY: X:  %f. Y: %f", velocity.x, velocity.y);
+				//b2Body_ApplyLinearImpulseToCenter(body, {hitVel.x * 0.5, hitVel.y * 0.5}, true);
+
 
 			}
 		}
