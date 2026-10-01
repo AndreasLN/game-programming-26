@@ -9,6 +9,19 @@ set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
 
 set(BUILD_SHARED_LIBS OFF)
 
+set(SDLMIXER_VENDORED ON)
+    set(SDLMIXER_VORBIS_VORBISFILE OFF)
+    set(SDLMIXER_FLAC_LIBFLAC OFF)
+    set(SDLMIXER_OPUS OFF)
+    set(SDLMIXER_GME OFF)
+    set(SDLMIXER_MOD OFF)
+    set(SDLMIXER_MP3_MPG123 OFF)
+    set(SDLMIXER_MIDI OFF)
+
+set(SDLTTF_VENDORED ON)
+    set(SDLTTF_HARFBUZZ OFF)
+    set(SDLTTF_PLUTOSVG OFF)
+
 # 3rd party libraries
 add_subdirectory(lib/SDL)
 add_subdirectory(lib/SDL_mixer)
