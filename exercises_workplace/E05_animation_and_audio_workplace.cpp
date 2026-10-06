@@ -1,5 +1,17 @@
 #include <itu_engine.hpp>
 
+
+using namespace std;
+#include <list>
+
+using namespace std;
+#include <string>
+
+using namespace std;
+#include <map>
+
+
+
 const char* const PATH_MUSIC[] =
 {
     "data/opengameart.org/music_level_0.ogg",
@@ -12,7 +24,7 @@ const char* const PATH_SFXS[] =
     "data/kenney/SFX/footstep01.ogg"
 };
 
-struct Animator
+struct Animator // for changing sprites in spritesheet
 {
     vec2f texture_size;
     float y_pos; // what height on the sheet are we?
@@ -32,15 +44,24 @@ struct Player
     Animator *  animator;
 };
 
-
+struct Interpolater
+{
+    EasingFunction easingFunction;
+    vec2f startPos;
+    vec2f endPos;
+    float time;
+};
 
 struct Npc
 {
     Transform2D transform;
     Sprite      sprite;
-
+    Interpolater * interpolater;
     vec2f offset;
+    vec2f startPos;
+    vec2f endPos;
     float speed;
+    bool switchy = false;
 };
 
 struct GameState
@@ -182,12 +203,21 @@ void game_reset(EngineContext* context, GameState* state)
 
     for(int i = 0; i < 3; ++i)
     {
+        Interpolater * interpolater = new Interpolater();
+        interpolater->time = 0;
+        interpolater->easingFunction = EASING_LINEAR;
+        
         Npc* npc = &state->npcs[i];
         npc->transform.scale = VEC2F_ONE * 0.5f;
         npc->transform.position = { 0, (float)i };
         itu_lib_sprite_init(&npc->sprite, state->tex_atlas_space, { 5*128.0f, i*128.0f, 128.0f, 128.0f });
         npc->offset = { 3, 0 };
         npc->speed = 1; // units per second
+        npc->interpolater = interpolater;
+
+        npc->startPos = npc->transform.position;
+        npc->endPos = npc->transform.position + npc->offset;
+
     }
 }
 
@@ -242,8 +272,9 @@ void game_debug(EngineContext* context, GameState* state)
         ImGui::DragFloat2("Scale", &npc->transform.scale.x);
         ImGui::DragFloat2("Anim offset", &npc->offset.x);
         ImGui::DragFloat ("Speed", &npc->speed);
+        ImGui::Combo("Easing", (int*)&npc->interpolater->easingFunction, easing_names, array_size(easing_names));
         ImGui::PopID();
-
+        
         vec2f pos_a = itu_lib_context_point_global_to_screen(context, npc->transform.position);
         vec2f pos_b = itu_lib_context_point_global_to_screen(context, npc->transform.position + npc->offset);
         itu_lib_render_screen_point(context->renderer, pos_a, 5, COLOR_YELLOW);
@@ -261,8 +292,7 @@ void animate(EngineContext* context, Sprite * sprite, Animator * animator, float
                 animator->texture_size.x * floorf(ratio * (animator->finish - animator->start));
     
     animator->cur_time += context->delta * speed;
-    SDL_Log("%f", ratio);
-    SDL_Log("%f", cur_x);
+
     if ( animator->cur_time > animator->timer_limit){
         animator->cur_time = 0;
     }
@@ -270,8 +300,10 @@ void animate(EngineContext* context, Sprite * sprite, Animator * animator, float
     sprite->rect = {cur_x, animator->y_pos, animator->texture_size.x, animator->texture_size.y};
 }
 
+
 void update_player(EngineContext* context, GameState* state)
 {
+    
     const float SPEED = 2.0f;
     float dir = 0.0f;
     if(context->btn_isdown[BTN_TYPE_LEFT])  
@@ -303,7 +335,32 @@ void update_player(EngineContext* context, GameState* state)
 
 }
 
+float interpolate(EngineContext* context, Interpolater * interpolater, Npc * npc){
+    
+    if(interpolater->time > 1){
+        npc->switchy = !npc->switchy;
+        interpolater->time = 0;
+        return 0;
+    }
+    float easer = easing(interpolater->time, interpolater->easingFunction);
+    interpolater->time += context->delta * npc->speed;
+    return easer;
+
+}
+
 void update_npcs(EngineContext* context, GameState* state)
 {
-
+    
+    for (int i = 0; i < 3; ++i){
+        float movement = interpolate(context, state->npcs[i].interpolater, &state->npcs[i]);
+        Npc * npc = &state->npcs[i];
+        if (npc->switchy){
+            npc->transform.position = lerp(npc->startPos, npc->endPos, movement);
+        }
+        else{
+            npc->transform.position = lerp(npc->endPos, npc->startPos, movement);
+        }
+        state->npcs[i].offset = npc->endPos - npc->transform.position;
+    }
+    
 }
