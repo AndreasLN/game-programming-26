@@ -253,14 +253,14 @@ void game_debug(EngineContext* context, GameState* state)
     ImGui::End();
 }
 
-void animate(EngineContext* context, Sprite * sprite, Animator * animator){
+void animate(EngineContext* context, Sprite * sprite, Animator * animator, float speed){
 
     float ratio = animator->cur_time / animator->timer_limit;
 
     float cur_x = (animator->texture_size.x + animator->start) + 
                 animator->texture_size.x * floorf(ratio * (animator->finish - animator->start));
     
-    animator->cur_time += context->delta;
+    animator->cur_time += context->delta * speed;
     SDL_Log("%f", ratio);
     SDL_Log("%f", cur_x);
     if ( animator->cur_time > animator->timer_limit){
@@ -289,7 +289,7 @@ void update_player(EngineContext* context, GameState* state)
         state->player.transform.scale.x = 1;
     }
     if (dir != 0){
-        animate(context, &state->player.sprite, state->player.animator);
+        animate(context, &state->player.sprite, state->player.animator, SPEED);
     }
     else{
         state->player.sprite.rect = { 0, 0, 96, 128 };
