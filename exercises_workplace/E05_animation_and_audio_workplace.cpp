@@ -12,6 +12,16 @@ const char* const PATH_SFXS[] =
     "data/kenney/SFX/footstep01.ogg"
 };
 
+struct Animator
+{
+    vec2f texture_size;
+    float y_pos; // what height on the sheet are we?
+    int start;
+    int finish;
+    float cur_time = 0;
+    float timer_limit = 1;
+};
+
 struct Player
 {
     vec2f position;
@@ -19,7 +29,10 @@ struct Player
     float direction;
     Transform2D transform;
     Sprite      sprite;
+    Animator *  animator;
 };
+
+
 
 struct Npc
 {
@@ -148,11 +161,24 @@ void game_reset(EngineContext* context, GameState* state)
     // reset context
     context->camera_default.world_position = VEC2F_ZERO;
 
+    Animator * animator = new Animator();
+
+  
+
     state->player.transform.scale = VEC2F_ONE;
     state->player.transform.position = { 2, -2 };
     SDL_FRect rect = { 0, 0, 96, 128 };
     state->player_rect = &rect;
     itu_lib_sprite_init(&state->player.sprite, state->tex_atlas_player, *state->player_rect);
+
+    animator->start = 0;
+    animator->finish = 7;
+    animator->cur_time = 0;
+    animator->texture_size = {rect.w, rect.h};
+    animator->y_pos = 512;
+    animator->timer_limit = 1;
+
+    state->player.animator = animator;
 
     for(int i = 0; i < 3; ++i)
     {
@@ -227,6 +253,23 @@ void game_debug(EngineContext* context, GameState* state)
     ImGui::End();
 }
 
+void animate(EngineContext* context, Sprite * sprite, Animator * animator){
+
+    float ratio = animator->cur_time / animator->timer_limit;
+
+    float cur_x = (animator->texture_size.x + animator->start) + 
+                animator->texture_size.x * floorf(ratio * (animator->finish - animator->start));
+    
+    animator->cur_time += context->delta;
+    SDL_Log("%f", ratio);
+    SDL_Log("%f", cur_x);
+    if ( animator->cur_time > animator->timer_limit){
+        animator->cur_time = 0;
+    }
+
+    sprite->rect = {cur_x, animator->y_pos, animator->texture_size.x, animator->texture_size.y};
+}
+
 void update_player(EngineContext* context, GameState* state)
 {
     const float SPEED = 2.0f;
@@ -244,6 +287,13 @@ void update_player(EngineContext* context, GameState* state)
     }
     else{
         state->player.transform.scale.x = 1;
+    }
+    if (dir != 0){
+        animate(context, &state->player.sprite, state->player.animator);
+    }
+    else{
+        state->player.sprite.rect = { 0, 0, 96, 128 };
+        state->player.animator->cur_time = 0;
     }
 
     state->player.direction = dir;
