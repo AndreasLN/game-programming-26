@@ -1,6 +1,6 @@
 # build and project folders
 out*
-build*
+build/
 .vs
 .vscode
 .idea
