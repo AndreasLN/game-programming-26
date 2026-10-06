@@ -78,6 +78,8 @@ struct GameState
 
 
     MIX_Track* track_main_bg;
+    MIX_Track* track_secondary_bg;
+
 
     float master_volume = 1;
     float music_volume = 0.15;
@@ -187,8 +189,16 @@ void game_init(EngineContext* context, GameState* state)
     
     SDL_VALIDATE(state->track_main_bg = MIX_CreateTrack(state->mixer));
     SDL_VALIDATE(MIX_SetTrackAudio(state->track_main_bg, state->audio_music[0]));
-    SDL_VALIDATE(MIX_SetTrackGain(state->track_main_bg, state->music_volume));
+    SDL_VALIDATE(MIX_TagTrack(state->track_main_bg, "MUSIC"));
+
     MIX_PlayTrack(state->track_main_bg, options);
+
+    SDL_VALIDATE(state->track_secondary_bg = MIX_CreateTrack(state->mixer));
+    SDL_VALIDATE(MIX_SetTrackAudio(state->track_secondary_bg, state->audio_music[1]));
+    SDL_VALIDATE(MIX_TagTrack(state->track_secondary_bg, "MUSIC"));
+    
+
+    SDL_VALIDATE(MIX_SetTagGain(state->mixer, "MUSIC", state->music_volume));
     
 }
 
@@ -267,7 +277,25 @@ void game_debug(EngineContext* context, GameState* state)
     {
         if(ImGui::Combo("Music Track", &state->music_current, PATH_MUSIC, array_size(PATH_MUSIC)))
         {
-            SDL_VALIDATE(MIX_SetTrackAudio(state->track_main_bg, state->audio_music[state->music_current]));
+
+            SDL_PropertiesID options = SDL_CreateProperties();
+            if (!options) {
+                SDL_Log("Couldn't create play options: %s", SDL_GetError());
+                SDL_APP_FAILURE;
+            }
+
+            SDL_SetNumberProperty(options, MIX_PROP_PLAY_LOOPS_NUMBER, -1);
+            SDL_SetNumberProperty(options, MIX_PROP_PLAY_FADE_IN_MILLISECONDS_NUMBER, 2000);
+
+            if (MIX_TrackPlaying(state->track_main_bg)){
+                SDL_VALIDATE(MIX_StopTrack(state->track_main_bg, 40000));
+                SDL_VALIDATE(MIX_PlayTrack(state->track_secondary_bg, options));
+            }
+            else if (MIX_TrackPlaying(state->track_secondary_bg)){
+                SDL_VALIDATE(MIX_StopTrack(state->track_secondary_bg, 40000));
+                SDL_VALIDATE(MIX_PlayTrack(state->track_main_bg, options));
+            }
+            
         }
     
         if(ImGui::DragFloat("Master Volume", &state->master_volume, 0.01, 0, 1))
