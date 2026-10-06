@@ -42,6 +42,7 @@ struct Player
     Transform2D transform;
     Sprite      sprite;
     Animator *  animator;
+    MIX_Track* footstep_track;
 };
 
 struct Interpolater
@@ -74,7 +75,12 @@ struct GameState
     MIX_Audio* audio_music[array_size(PATH_MUSIC)];
     MIX_Audio* audio_sfxs[array_size(PATH_SFXS)];
 
+
     MIX_Track* track_main_bg;
+
+    float master_volume = 1;
+    float music_volume = 0.15;
+    float sound_volume = 0.15;
 
     int music_current;
 
@@ -162,18 +168,17 @@ void game_init(EngineContext* context, GameState* state)
 
     SDL_VALIDATE(MIX_Init());
     SDL_VALIDATE(state->mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL));
-    SDL_VALIDATE(MIX_SetMixerGain(state->mixer, 1.0f));
+    SDL_VALIDATE(MIX_SetMixerGain(state->mixer, state->master_volume));
 
     for(Uint64 i = 0; i < array_size(PATH_MUSIC); ++i)
         SDL_VALIDATE(state->audio_music[i] = MIX_LoadAudio(state->mixer, PATH_MUSIC[i], false));
 
     for(Uint64 i = 0; i < array_size(PATH_SFXS); ++i)
         SDL_VALIDATE(state->audio_sfxs[i] = MIX_LoadAudio(state->mixer, PATH_SFXS[i], false));
-
+    
     SDL_VALIDATE(state->track_main_bg = MIX_CreateTrack(state->mixer));
-
     SDL_VALIDATE(MIX_SetTrackAudio(state->track_main_bg, state->audio_music[0]));
-    SDL_VALIDATE(MIX_SetTrackGain(state->track_main_bg, 0.15f));
+    SDL_VALIDATE(MIX_SetTrackGain(state->track_main_bg, state->music_volume));
     SDL_VALIDATE(MIX_PlayTrack(state->track_main_bg, 0));
 }
 
@@ -191,6 +196,10 @@ void game_reset(EngineContext* context, GameState* state)
     SDL_FRect rect = { 0, 0, 96, 128 };
     state->player_rect = &rect;
     itu_lib_sprite_init(&state->player.sprite, state->tex_atlas_player, *state->player_rect);
+    SDL_VALIDATE(state->player.footstep_track = MIX_CreateTrack(state->mixer));
+    SDL_VALIDATE(MIX_SetTrackAudio(state->player.footstep_track, state->audio_sfxs[0]));
+    SDL_VALIDATE(MIX_TagTrack(state->player.footstep_track, "SFX"));
+    SDL_VALIDATE(MIX_SetTrackGain(state->player.footstep_track, state->sound_volume));
 
     animator->start = 0;
     animator->finish = 7;
@@ -248,8 +257,14 @@ void game_debug(EngineContext* context, GameState* state)
     {
         if(ImGui::Combo("Music Track", &state->music_current, PATH_MUSIC, array_size(PATH_MUSIC)))
             SDL_VALIDATE(MIX_SetTrackAudio(state->track_main_bg, state->audio_music[state->music_current]));
-    }
+    
+        if(ImGui::DragFloat("Master Volume", &state->master_volume, 0.01, 0, 1))
+            SDL_VALIDATE(MIX_SetMixerGain(state->mixer, state->master_volume));
 
+        if(ImGui::DragFloat("Music Volume", &state->music_volume, 0.01, 0, 1))
+            SDL_VALIDATE(MIX_SetTrackGain(state->track_main_bg, state->music_volume));
+
+    }
 
     ImGui::SeparatorText("Player");
     {
@@ -284,7 +299,7 @@ void game_debug(EngineContext* context, GameState* state)
     ImGui::End();
 }
 
-void animate(EngineContext* context, Sprite * sprite, Animator * animator, float speed){
+float animate(EngineContext* context, Sprite * sprite, Animator * animator, float speed){
 
     float ratio = animator->cur_time / animator->timer_limit;
 
@@ -298,12 +313,23 @@ void animate(EngineContext* context, Sprite * sprite, Animator * animator, float
     }
 
     sprite->rect = {cur_x, animator->y_pos, animator->texture_size.x, animator->texture_size.y};
+
+    return cur_x;
+}
+
+float playtrack(EngineContext* context, MIX_Track * track, float timer, float MAX_timer){
+
+    if (timer > MAX_timer){
+        SDL_VALIDATE(MIX_PlayTrack(track, 0));
+        return 0;
+    }
+
+    return timer - context->delta;
 }
 
 
 void update_player(EngineContext* context, GameState* state)
 {
-    
     const float SPEED = 2.0f;
     float dir = 0.0f;
     if(context->btn_isdown[BTN_TYPE_LEFT])  
@@ -321,7 +347,15 @@ void update_player(EngineContext* context, GameState* state)
         state->player.transform.scale.x = 1;
     }
     if (dir != 0){
-        animate(context, &state->player.sprite, state->player.animator, SPEED);
+        float frame = animate(context, &state->player.sprite, state->player.animator, SPEED);
+        if (frame == 1 || frame == 3){
+            if ( frame == 1){
+                SDL_VALIDATE(MIX_SetTrackAudio(state->player.footstep_track, state->audio_sfxs[0]));
+            } else{
+                SDL_VALIDATE(MIX_SetTrackAudio(state->player.footstep_track, state->audio_sfxs[1]))
+            }
+            SDL_VALIDATE(MIX_PlayTrack(state->player.footstep_track, 0));
+        }
     }
     else{
         state->player.sprite.rect = { 0, 0, 96, 128 };
