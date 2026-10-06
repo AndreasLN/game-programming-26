@@ -38,6 +38,7 @@ struct Player
 {
     vec2f position;
     float velocity;
+    float speed = 1.0;
     float direction;
     Transform2D transform;
     Sprite      sprite;
@@ -166,6 +167,14 @@ void game_init(EngineContext* context, GameState* state)
         SDL_SCALEMODE_LINEAR
     );
 
+    SDL_PropertiesID options = SDL_CreateProperties();
+    if (!options) {
+        SDL_Log("Couldn't create play options: %s", SDL_GetError());
+        SDL_APP_FAILURE;
+    }
+
+    SDL_SetNumberProperty(options, MIX_PROP_PLAY_LOOPS_NUMBER, -1);
+
     SDL_VALIDATE(MIX_Init());
     SDL_VALIDATE(state->mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL));
     SDL_VALIDATE(MIX_SetMixerGain(state->mixer, state->master_volume));
@@ -179,7 +188,8 @@ void game_init(EngineContext* context, GameState* state)
     SDL_VALIDATE(state->track_main_bg = MIX_CreateTrack(state->mixer));
     SDL_VALIDATE(MIX_SetTrackAudio(state->track_main_bg, state->audio_music[0]));
     SDL_VALIDATE(MIX_SetTrackGain(state->track_main_bg, state->music_volume));
-    SDL_VALIDATE(MIX_PlayTrack(state->track_main_bg, 0));
+    MIX_PlayTrack(state->track_main_bg, options);
+    
 }
 
 void game_reset(EngineContext* context, GameState* state)
@@ -256,13 +266,18 @@ void game_debug(EngineContext* context, GameState* state)
     ImGui::SeparatorText("Music");
     {
         if(ImGui::Combo("Music Track", &state->music_current, PATH_MUSIC, array_size(PATH_MUSIC)))
+        {
             SDL_VALIDATE(MIX_SetTrackAudio(state->track_main_bg, state->audio_music[state->music_current]));
+        }
     
         if(ImGui::DragFloat("Master Volume", &state->master_volume, 0.01, 0, 1))
             SDL_VALIDATE(MIX_SetMixerGain(state->mixer, state->master_volume));
 
         if(ImGui::DragFloat("Music Volume", &state->music_volume, 0.01, 0, 1))
             SDL_VALIDATE(MIX_SetTrackGain(state->track_main_bg, state->music_volume));
+
+        if(ImGui::DragFloat("Sound Volume", &state->sound_volume, 0.01, 0, 1))
+            SDL_VALIDATE(MIX_SetTagGain(state->mixer, "SFX", state->sound_volume));
 
     }
 
@@ -271,6 +286,7 @@ void game_debug(EngineContext* context, GameState* state)
         ImGui::PushID(-1);
         ImGui::DragFloat2("Pos", &state->player.transform.position.x);
         ImGui::DragFloat ("Rot", &state->player.transform.rotation);
+        ImGui::DragFloat ("Speed", &state->player.speed, 0.01, 0.01, 1000);
         ImGui::DragFloat2("Scale", &state->player.transform.scale.x);
         ImGui::PopID();
     }
@@ -314,23 +330,13 @@ float animate(EngineContext* context, Sprite * sprite, Animator * animator, floa
 
     sprite->rect = {cur_x, animator->y_pos, animator->texture_size.x, animator->texture_size.y};
 
-    return cur_x;
-}
-
-float playtrack(EngineContext* context, MIX_Track * track, float timer, float MAX_timer){
-
-    if (timer > MAX_timer){
-        SDL_VALIDATE(MIX_PlayTrack(track, 0));
-        return 0;
-    }
-
-    return timer - context->delta;
+    return  floorf(ratio * (animator->finish - animator->start));
 }
 
 
 void update_player(EngineContext* context, GameState* state)
 {
-    const float SPEED = 2.0f;
+
     float dir = 0.0f;
     if(context->btn_isdown[BTN_TYPE_LEFT])  
     {
@@ -347,8 +353,8 @@ void update_player(EngineContext* context, GameState* state)
         state->player.transform.scale.x = 1;
     }
     if (dir != 0){
-        float frame = animate(context, &state->player.sprite, state->player.animator, SPEED);
-        if (frame == 1 || frame == 3){
+        float frame = animate(context, &state->player.sprite, state->player.animator, state->player.speed);
+        if (frame == 2 || frame == 6){
             if ( frame == 1){
                 SDL_VALIDATE(MIX_SetTrackAudio(state->player.footstep_track, state->audio_sfxs[0]));
             } else{
@@ -363,7 +369,7 @@ void update_player(EngineContext* context, GameState* state)
     }
 
     state->player.direction = dir;
-    state->player.velocity = dir * SPEED;
+    state->player.velocity = dir * state->player.speed;
 
     state->player.transform.position.x += state->player.velocity * context->delta;
 
