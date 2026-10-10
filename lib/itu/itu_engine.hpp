@@ -20,6 +20,12 @@
 #include <imgui/imgui_impl_sdlgpu3.h>
 #include <imgui/imgui_impl_sdlgpu3_shaders.h>
 
+#include <rapidjson/document.h>
+#include <rapidjson/writer.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/filereadstream.h>
+#include <rapidjson/filewritestream.h>
+
 #include <box2d/box2d.h>
 
 // low level libraries (no engine or memory allocation involved)
