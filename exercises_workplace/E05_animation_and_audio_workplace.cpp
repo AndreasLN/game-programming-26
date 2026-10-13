@@ -41,6 +41,7 @@ struct Player
     float speed = 1.0;
     float direction;
     Transform2D transform;
+    
     Sprite      sprite;
     Animator *  animator;
     MIX_Track* footstep_track;
