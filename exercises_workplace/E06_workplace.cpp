@@ -1,6 +1,9 @@
-#include "SDL3/SDL_video.h"
-#include <SDL3/SDL.h>
-#include <iostream>
+#define ENABLE_DIAGNOSTICS
+
+#include <itu_engine.hpp>
+
+#include "GameObjects/gameObjectsLib.hpp"
+
 
 using namespace std;
 #include <list>
@@ -11,211 +14,418 @@ using namespace std;
 using namespace std;
 #include <map>
 
-#include "GameObjects/gameObject.hpp"
-#include "GameObjects/component.hpp"
+bool DEBUG_render_textures = true;
+bool DEBUG_render_outlines = true;
+const int ENTITY_COUNT = 4096;
 
-float window_w = 800;
-float window_h = 600;
-bool gave_over = false;
+enum Direction{
+	LEFT,
+	RIGHT,
+	UP,
+	DOWN,
+	LAST
+};
+
+enum NPCSTATE{
+	MOVING,
+	IDLE,
+};
+
+struct E03_Entity
+{
+	Sprite sprite;
+	Transform2D transform;
+
+	E03_Entity() {
+	}
+
+	E03_Entity(Sprite sprite, Transform2D  transform) 
+	: sprite(sprite), transform(transform) {}
+
+};
+
+struct E03_Character_Entity: public E03_Entity
+{
+	Direction direction;
+
+	E03_Character_Entity() {}
+
+	E03_Character_Entity(Sprite  sprite, Transform2D  transform, Direction direction = DOWN)
+	: E03_Entity(sprite, transform), direction(direction) {}
+
+};
+
+struct Random_Timer
+{
+	float min;
+	float max;
+
+	float time = 2;
+
+	Random_Timer(float min, float max) 
+	: min(min), max(max) {time = 2;}
+
+};
+
+struct E03_CharacterNPC_Entity: public E03_Character_Entity
+{
+	Random_Timer * idle_timer;
+	Random_Timer * moving_timer;
+	NPCSTATE state;
+
+	E03_CharacterNPC_Entity() {}
+
+	E03_CharacterNPC_Entity(Sprite sprite, Transform2D transform, Direction direction, Random_Timer * idle, Random_Timer * moving)
+	: E03_Character_Entity(sprite, transform, direction), idle_timer(idle), moving_timer(moving) {state = IDLE;}
+};
 
 
 
-class NPC {
-  public:
-    float size;
-	SDL_FRect * rect;
-	int horizontal;
-	int vertical;
-	double speed;
-	NPC(float size, int horizontal, int vertical, double speed, SDL_FRect * rect, int start_x, int start_y) { // Constructor with parameters
-      this->size = size;
-      this->horizontal = horizontal;
-      this->vertical = vertical;
-	  this->speed = speed;
-	  this->rect = rect;
-	  (*rect).w = size;
-	  (*rect).h = size;
-	  (*rect).x = start_x + size / 2;
-	  (*rect).y = start_y + size / 2;
+
+bool operator<(const vec2f& lhs, const vec2f& rhs)
+{
+    if (lhs.x != rhs.x) {
+        return lhs.x < rhs.x;
+    } else {
+        return lhs.y < rhs.y;
     }
-
-
-	void move(SDL_Time time_elapsed_frame){
-		(*rect).x += horizontal * speed * time_elapsed_frame;
-        
-		(*rect).y += vertical * speed * time_elapsed_frame;
+}
+bool operator==(const vec2f& lhs, const vec2f& rhs)
+{
+	if(lhs.x == rhs.x && lhs.y == rhs.y){
+   		 return true;
 	}
-	void border_collision(float window_w, float window_h){
-
-		if((*rect).x < 0){
-				(*rect).x = 0;
-				horizontal = 1;
-		}
-		if((*rect).x + (*rect).w > window_w){
-			(*rect).x = window_w - (*rect).w;
-			horizontal = -1;
-		}
-		if((*rect).y < 0){
-			(*rect).y = 0;
-			vertical = 1;
-		}
-		if((*rect).y + (*rect).h > window_h){
-			(*rect).y = window_h - (*rect).h;
-			vertical = -1;
-		}
+	else{
+		return false;
 	}
 };
 
-class Player {
-	public:
-		SDL_FRect * rect;
-		int horizontal;
-		int vertical;
-		double speed;
-		float player_size;
-		Player(float player_size, int horizontal, int vertical, double speed, SDL_FRect * rect) { // Constructor with parameters
-			this->player_size = player_size;
-			this->horizontal = horizontal;
-			this->vertical = vertical;
-			this->speed = speed;
-			this->rect = rect;
-			(*rect).w = player_size;
-			(*rect).h = player_size;
-			(*rect).x = window_w / 2 - player_size / 2;
-			(*rect).y = window_h / 2 - player_size / 2;
-		}
-		void move(SDL_Time time_elapsed_frame){
-			(*rect).x += horizontal * speed * time_elapsed_frame;
-			(*rect).y += vertical * speed * time_elapsed_frame;
-		}
-		void border_collision(){
-			if((*rect).x < 0){
-					(*rect).x = 0;
-			}
-			if((*rect).x + (*rect).w > window_w){
-				(*rect).x = window_w - (*rect).w;
-			}
-			if((*rect).y < 0){
-				(*rect).y = 0;
-			}
-			if((*rect).y + (*rect).h > window_h){
-				(*rect).y = window_h - (*rect).h;
-			}
-		}
-		void npc_collision(NPC * npc){
-			if (SDL_HasRectIntersectionFloat(this->rect, (*npc).rect)){
-				SDL_Log("%s\n", "gave over");
-				gave_over = true;
-			}
-		}
+struct E03_TileMap
+{
+	map<vec2f, E03_Entity*> entities; // easier lookup for entities in tilemap;
+	map<vec2f, SDL_FRect> map; // Each sprite has unique transform
+	Transform2D transform;
 };
 
-void move(int horizontal, int vertical, double speed, SDL_Time time_elapsed_frame , SDL_FRect *player_rect)
+SDL_FRect dirt_1 = SDL_FRect{1, 4, 16, 16};
+
+SDL_FRect dirt_2 = SDL_FRect{0, 4, 16, 16};
+
+SDL_FRect guy = SDL_FRect{1, 7, 16, 16};
+
+map<vec2f, SDL_FRect> map_example = {
+	{{ -6, 3 }, dirt_2}, {{ -5, 3 }, dirt_2}, {{ -4, 3 }, dirt_1}, {{ -3, 3 }, dirt_1}, {{ -2, 3 }, dirt_2}, {{ -1, 3 }, dirt_1}, {{ 0, 3 }, dirt_2}, {{ 1, 3 }, dirt_1}, {{ 2, 3 }, dirt_1}, {{ 3, 3 }, dirt_1}, {{ 4, 3 }, dirt_2}, {{ 5, 3 }, dirt_2},
+	{{ -6, 2 }, dirt_2}, {{ -5, 2 }, dirt_2}, {{ -4, 2 }, dirt_1}, {{ -3, 2 }, dirt_1}, {{ -2, 2 }, dirt_2}, {{ -1, 2 }, dirt_1}, {{ 0, 2 }, dirt_2}, {{ 1, 2 }, dirt_1}, {{ 2, 2 }, dirt_1}, {{ 3, 2 }, dirt_1}, {{ 4, 2 }, dirt_2}, {{ 5, 2 }, dirt_2},
+	{{ -6, 1 }, dirt_2}, {{ -5, 1 }, dirt_2}, {{ -4, 1 }, dirt_1}, {{ -3, 1 }, dirt_1}, {{ -2, 1 }, dirt_2}, {{ -1, 1 }, dirt_1}, {{ 0, 1 }, dirt_2}, {{ 1, 1 }, dirt_1}, {{ 2, 1 }, dirt_1}, {{ 3, 1 }, dirt_1}, {{ 4, 1 }, dirt_2}, {{ 5, 1 }, dirt_2},
+	{{ -6, 0 }, dirt_1}, {{ -5, 0 }, dirt_1}, {{ -4, 0 }, dirt_1}, {{ -3, 0 }, dirt_1}, {{ -2, 0 }, dirt_1}, {{ -1, 0 }, dirt_1}, {{ 0, 0 }, dirt_2}, {{ 1, 0 }, dirt_1}, {{ 2, 0 }, dirt_2}, {{ 3, 0 }, dirt_1}, {{ 4, 0 }, dirt_1}, {{ 5, 0 }, dirt_1},
+	{{ -6, -1}, dirt_1}, {{ -5,-1 }, dirt_1}, {{ -4,-1 }, dirt_1}, {{ -3,-1 }, dirt_1}, {{ -2,-1 }, dirt_1}, {{ -1,-1 }, dirt_1}, {{ 0,-1 }, dirt_2}, {{ 1,-1 }, dirt_1}, {{ 2,-1 }, dirt_2}, {{ 3,-1 }, dirt_1}, {{ 4,-1 }, dirt_1}, {{ 5,-1 }, dirt_1},
+	{{ -6,-2 }, dirt_1}, {{ -5,-2 }, dirt_1}, {{ -4,-2 }, dirt_1}, {{ -3,-2 }, dirt_1}, {{ -2,-2 }, dirt_1}, {{ -1,-2 }, dirt_1}, {{ 0,-2 }, dirt_2}, {{ 1,-2 }, dirt_1}, {{ 2,-2 }, dirt_2}, {{ 3,-2 }, dirt_1}, {{ 4,-2 }, dirt_1}, {{ 5,-2 }, dirt_1},
+};
+
+
+struct E03_GameState
 {
-	(*player_rect).x += horizontal * speed * time_elapsed_frame;
-	(*player_rect).y += vertical * speed * time_elapsed_frame;
-}
+	// shortcut references
+	E03_Character_Entity* player;
+	E03_TileMap* tilemap;
 
-void border_collision(SDL_FRect *player_rect, float window_w, float window_h){
+	// game-allocated memory
+	list<E03_Entity*> entities;
+	list<E03_CharacterNPC_Entity*> npcs;
+	int entities_alive_count;
 
-	if((*player_rect).x < 0){
-			(*player_rect).x = 0;
-	}
-	if((*player_rect).x + (*player_rect).w > window_w){
-		(*player_rect).x = window_w - (*player_rect).w;
-	}
-	if((*player_rect).y < 0){
-		(*player_rect).y = 0;
-	}
-	if((*player_rect).y + (*player_rect).h > window_h){
-		(*player_rect).y = window_h - (*player_rect).h;
-	}
+	// SDL-allocated structures
+	SDL_Texture* atlas;
+	SDL_Texture* bg;
+};
 
-}
-
-void NPC_border_collision(NPC npc, float window_w, float window_h){
-
-	if((*npc.rect).x < 0){
-			(*npc.rect).x = 0;
-	}
-	if((*npc.rect).x + (*npc.rect).w > window_w){
-		(*npc.rect).x = window_w - (*npc.rect).w;
-	}
-	if((*npc.rect).y < 0){
-		(*npc.rect).y = 0;
-	}
-	if((*npc.rect).y + (*npc.rect).h > window_h){
-		(*npc.rect).y = window_h - (*npc.rect).h;
-	}
-
-}
-
-int main(int argc, char* argv[])
+static void entity_create(E03_GameState* state, E03_Entity * entity)
 {
+	if(!(state->entities_alive_count < ENTITY_COUNT))
+		// NOTE: this might as well be an assert, if we don't have a way to recover/handle it
+		return;
 
-	int target_framerate_ms = 1000 / 60;       // 16 milliseconds
-	int target_framerate_ns = 1000000000 / 60; // 16666666 nanoseconds
+	// // concise version
+	//return &state->entities[state->entities_alive_count++];
 
-	SDL_Window* window = SDL_CreateWindow("E00 - introduction", window_w, window_h, 0);
-	SDL_Renderer* renderer = SDL_CreateRenderer(window, NULL);
+	state->entities.push_back(entity);
+	
+	++state->entities_alive_count;
+	return;
+}
 
+// NOTE: this only works if nobody holds references to other entities!
+//       if that were the case, we couldn't swap them around.
+//       We will see in later lectures how to handle this kind of problems
+static void entity_destroy(E03_GameState* state, E03_Entity* entity)
+{
+	// NOTE: here we want to fail hard, nobody should pass us a pointer not gotten from `entity_create()`
+	
+	--state->entities_alive_count;
+	state->entities.remove(entity);
+}
 
-	// increase the zoom to make debug text more legible
-	// (ie, on the class projector, we will usually use 2)
+static void game_init(EngineContext* context, E03_GameState* state)
+{
+	// allocate memory
+	state->entities = { };
+
+	// TODO allocate space for tile info (when we'll load those from file)
+	// texture atlases
+	state->atlas = itu_resources_texture_create(context, "data/kenney/tiny_dungeon_packed.png", SDL_SCALEMODE_NEAREST);
+	state->bg    = itu_resources_texture_create(context, "data/kenney/prototype_texture_dark/texture_13.png", SDL_SCALEMODE_NEAREST);
+}
+
+static void mouse_tint(EngineContext* context, E03_GameState* state){
+		// TINT WITH MOUSE
+		vec2f point = itu_lib_context_point_screen_to_global(context, context->mouse_pos);
+		try
+		{
+			auto entity = state->tilemap->entities.at(vec2f{floorf(point.x), floorf(point.y)});
+			entity->sprite.tint.r = 100;
+		}
+		catch(const std::exception& e)
+		{
+		}
+}
+
+static void game_reset(EngineContext* context, E03_GameState* state)
+{
+	state->entities_alive_count = 0;
+	// entities
 	{
-		float zoom = 2;
-		window_w /= zoom;
-		window_h /= zoom;
-		SDL_SetRenderScale(renderer, zoom, zoom);
+		E03_Entity * bg = new E03_Entity();
+
+		entity_create(state, bg);
+		SDL_FRect sprite_rect = SDL_FRect{ 0, 0, 1024, 1024};
+		itu_lib_sprite_init(
+			&bg->sprite,
+			state->bg,
+			itu_lib_sprite_get_source_rect(0, 0, 1024, 1024)
+		);
+		bg->transform.scale = VEC2F_ONE;
+		bg->transform.rotation = 0;
+		bg->transform.position = VEC2F_ZERO;
+	}
+
+	// TILEMAP
+	{
+		state->tilemap = new E03_TileMap();
+		state->tilemap->transform.position = VEC2F_ZERO;
+		state->tilemap->transform.scale = VEC2F_ONE;
+		state->tilemap->map = map_example;
+		state->tilemap->entities = {};
+
+		for(auto pair : state->tilemap->map){
+			E03_Entity* entity = new E03_Entity();
+			entity_create(state, entity);
+			entity->transform.scale = state->tilemap->transform.scale;
+			entity->transform.position = state->tilemap->transform.position + pair.first;
+			entity->transform.rotation = 0;
+
+			itu_lib_sprite_init(
+				&entity->sprite,
+				state->atlas,
+				itu_lib_sprite_get_source_rect(pair.second.x, pair.second.y, pair.second.w, pair.second.h)
+			);
+			entity->sprite.pivot.y = 0.0f;
+			entity->sprite.pivot.x = 0.0f;
+			state->tilemap->entities[pair.first] = entity;
+		}
 	}
 
 	
+	// NPC
+	{
+		for(int i = 0 ; i < 10; ++i){
+			Random_Timer * idle = new Random_Timer(1, 3);
+			Random_Timer * moving = new Random_Timer(2, 4);
+			E03_CharacterNPC_Entity* npc = new E03_CharacterNPC_Entity();
+			entity_create(state, npc);
+			npc->idle_timer = idle;
+			npc->moving_timer = moving;
+			npc->transform.scale = VEC2F_ONE;
+			npc->transform.position = VEC2F_ONE;
+			npc->transform.rotation = 0;
+			npc->state = IDLE;
+			itu_lib_sprite_init(
+				&npc->sprite,
+				state->atlas,
+				itu_lib_sprite_get_source_rect(guy.x, guy.y, guy.w, guy.h)
+			);
+			SDL_Log("%d", npc->state);
+			//npc->sprite.pivot.y = 0.3f;
+			state->npcs.push_front(npc);
+		}
+	}
+
+
+	{
+		state->player = new E03_Character_Entity();
+		entity_create(state, state->player);
+		state->player->transform.position = VEC2F_ZERO;
+		state->player->transform.scale = VEC2F_ONE;
+		state->player->transform.rotation = 0;
+		itu_lib_sprite_init(
+			&state->player->sprite,
+			state->atlas,
+			itu_lib_sprite_get_source_rect(1, 10, 16, 16)
+		);
+
+		// raise sprite a bit, so that the position concides with the center of the image
+		state->player->sprite.pivot.y = 0.3f;
+	}
+}
+
+static void game_update(EngineContext* context, E03_GameState* state)
+{
+	{
+		const float player_speed = 2;
+
+		E03_Entity* entity = state->player;
+		vec2f mov = { 0 };
+		if(context->btn_isdown_up){
+			mov.y += 1;
+			state->player->direction = UP;
+		}		
+		if(context->btn_isdown_down){
+			mov.y -= 1;
+			state->player->direction = DOWN;
+		}	
+		if(context->btn_isdown_left){
+			mov.x -= 1;
+			state->player->direction = LEFT;	
+		}	
+		if(context->btn_isdown_right){
+			mov.x += 1;
+			state->player->direction = RIGHT;
+		}
+				
+		if(state->player->direction == LEFT && !state->player->sprite.flip_horizontal){
+			state->player->sprite.flip_horizontal = true;
+		}
+		else if (state->player->direction == RIGHT && state->player->sprite.flip_horizontal){
+			state->player->sprite.flip_horizontal = false;
+		}
+
+		entity->transform.position = entity->transform.position + mov * (player_speed * context->delta);
+
+		// camera follows player
+		context->camera_active->world_position = entity->transform.position;
+	}
+
+	const float npc_speed = 1.5;
+
+	for(E03_CharacterNPC_Entity * npc : state->npcs){
+		vec2f mov = { 0 };
+		//SDL_Log("%d", npc->state);
+		switch (npc->state)
+		{
+			case IDLE:
+
+				if (npc->idle_timer->time > 0.0f){
+					npc->idle_timer->time -= context->delta;
+				}
+				else{
+					npc->state = MOVING;
+					npc->moving_timer->time = npc->moving_timer->max + SDL_randf() * (npc->moving_timer->min - npc->moving_timer->max);
+					npc->direction = Direction(SDL_rand(LAST - 1));
+
+				}
+				break;
+			case MOVING:
+				if (npc->moving_timer->time > 0){
+					switch (npc->direction)
+					{
+					case UP:
+						mov.y += 1;
+						break;
+					case DOWN:
+						mov.y -= 1;
+						break;
+					case LEFT:
+						mov.x -= 1;
+						break;
+					case RIGHT:
+						mov.x += 1;
+						break;
+					default:
+						break;
+					}
+					if(npc->direction == LEFT && !npc->sprite.flip_horizontal){
+						npc->sprite.flip_horizontal = true;
+					}
+					else if (npc->direction == RIGHT && npc->sprite.flip_horizontal){
+						npc->sprite.flip_horizontal = false;
+					}
+
+					npc->transform.position = npc->transform.position + mov * (npc_speed * context->delta);
+					npc->moving_timer->time -= context->delta;
+				}
+				else{
+					npc->state = IDLE;
+					npc->idle_timer->time = npc->idle_timer->max + SDL_randf() * (npc->idle_timer->min - npc->idle_timer->max);
+				}
+				break;
+
+			default:
+				break;
+			}
+	}
+
+}
+
+static void game_render(EngineContext* context, E03_GameState* state)
+{
+	for(E03_Entity * entity : state->entities)
+	{
+		// render texture
+		SDL_FRect rect_src = entity->sprite.rect;
+		SDL_FRect rect_dst;
+
+		if(DEBUG_render_textures)
+			itu_lib_sprite_render(context, &entity->sprite, &entity->transform);
+
+		if(DEBUG_render_outlines)
+			itu_lib_sprite_render_debug(context, &entity->sprite, &entity->transform);
+		
+		entity->sprite.tint.r = 1;
+	}
+
+	// debug window
+	SDL_SetRenderDrawColor(context->renderer, 0xFF, 0x00, 0xFF, 0xff);
+	SDL_RenderRect(context->renderer, NULL);
+}
+
+int main(void)
+{
+	EngineConfig config;
+	config.application_name = "ES03 - Coordinate Systems";
+	config.texture_pixels_per_unit = 16;
+	config.camera_pixel_per_unit = 64;
+	config.step_per_second_fluid = 60;
 
 	bool quit = false;
+	SDL_Window* window;
+	EngineContext context = { 0 };
+	E03_GameState  state   = { 0 };
 
-	SDL_Time walltime_frame_beg;
-	SDL_Time walltime_work_end;
-	SDL_Time walltime_frame_end = 0;
-	SDL_Time time_elapsed_frame;
-	SDL_Time time_elapsed_work;
+	itu_lib_context_init(&config, &context);
+	itu_lib_context_set_active_camera(&context, &context.camera_default);
 
-	SDL_Time time_elapsed_sleep;
-	SDL_Time time_elapsed_busywait;
 
-	int delay_type = 0;
-	
+	game_init(&context, &state);
+	game_reset(&context, &state);
 
-	SDL_FRect player_rect;
-	SDL_FRect player_rect_2;
+	itu_lib_context_frame_timing_setup(&context);
 
-	Player player_1(40.0f, 0, 0, 0.0000005, &player_rect);
-	
-	Player player_2(40.0f, 0, 0, 0.0000005, &player_rect_2);
-
-	SDL_FRect NPC_rect;
-	SDL_FRect NPC_rect_2;
-	SDL_FRect NPC_rect_3;
-	NPC npc(20, 1, 1, 0.0000001, &NPC_rect, 0, 0);
-	NPC npc2(20, -1, 1, 0.0000001, &NPC_rect_2, window_w - 20, 0);
-	NPC npc3(20, 1, -1, 0.0000001, &NPC_rect_3, 0, window_h - 20);
-
-	NPC * npcs[3]{
-		&npc,
-		&npc2,
-		&npc3,
-	};
-	
-
-	bool btn_pressed_up = false;
-
-	SDL_GetCurrentTime(&walltime_frame_beg);
 	while(!quit)
 	{
-		//move(horizontal, vertical, speed, player_rect);
-		
-		//std::cout << horizontal;
+		mouse_tint(&context, &state);
+
 		// input
 		SDL_Event event;
+		itu_lib_input_clear(&context);
 		while(SDL_PollEvent(&event))
 		{
 			switch(event.type)
@@ -223,232 +433,74 @@ int main(int argc, char* argv[])
 				case SDL_EVENT_QUIT:
 					quit = true;
 					break;
-				case SDL_EVENT_KEY_UP:
-					switch (event.key.key)
-						{
-						case SDLK_W:
-							//std::cout << "hello";
-							if(player_1.vertical < 0)
-								player_1.vertical = 0;
-							break;
-						case SDLK_A:
-							//cout << "LEFT";
-							if(player_1.horizontal < 0)
-								player_1.horizontal = 0;
-							break;
-						case SDLK_S:
-							//cout << "DOWN";
-							if(player_1.vertical > 0)
-								player_1.vertical = 0;
-							break;
-						case SDLK_D:
-							//cout << "RIGHT";
-							if(player_1.horizontal > 0)
-								player_1.horizontal = 0;
-							break;
-						case SDLK_UP:
-							//std::cout << "hello";
-							if(player_2.vertical < 0)
-								player_2.vertical = 0;
-							break;
-						case SDLK_LEFT:
-							//cout << "LEFT";
-							if(player_2.horizontal < 0)
-								player_2.horizontal = 0;
-							break;
-						case SDLK_DOWN:
-							//cout << "DOWN";
-							if(player_2.vertical > 0)
-								player_2.vertical = 0;
-							break;
-						case SDLK_RIGHT:
-							//cout << "RIGHT";
-							if(player_2.horizontal > 0)
-								player_2.horizontal = 0;
-							break;
-						}
-					break;
-				case SDL_EVENT_KEY_DOWN:
-					if(event.key.key >= SDLK_1 && event.key.key < SDLK_6){
-						delay_type = event.key.key - SDLK_1;
-						break;
-					}
-					else{
-						switch (event.key.key)
-						{
-							case SDLK_D:
-								//cout << "RIGHT";
-								player_1.horizontal = 1;
-								break;
-							case SDLK_A:
-								//cout << "LEFT";
-								player_1.horizontal = -1;
-								break;
-							case SDLK_W:
-								player_1.vertical = -1;
-								break;
-							case SDLK_S:
-								//cout << "DOWN";
-								player_1.vertical = 1;
-								break;
-							case SDLK_RIGHT:
-								//cout << "RIGHT";
-								player_2.horizontal = 1;
-								break;
-							case SDLK_LEFT:
-								//cout << "LEFT";
-								player_2.horizontal = -1;
-								break;
-							case SDLK_UP:
-								player_2.vertical = -1;
-								break;
-							case SDLK_DOWN:
-								//cout << "DOWN";
-								player_2.vertical = 1;
-								break;
-						}
-					}
-					break;
-
-			}
-		}
-		// clear screen
-		// NOTE: `0x` prefix means we are expressing the number in hexadecimal (base 16)
-		//       `0b` is another useful prefix, expresses the number in binary
-		SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0x00);
-		SDL_RenderClear(renderer);
-		
-		SDL_SetRenderDrawColor(renderer, 0x3C, 0x63, 0xFF, 0XFF);
-		SDL_RenderFillRect(renderer, &player_rect);
-
-		SDL_SetRenderDrawColor(renderer, 0x3C, 0x63, 0x00, 0XFF);
-		SDL_RenderFillRect(renderer, &player_rect_2);
-
-		SDL_SetRenderDrawColor(renderer, 0x63, 0x00, 0x00, 0XFF);
-		
-		for (NPC * npc : npcs)
-		{
-			SDL_RenderFillRect(renderer, npc->rect);
-		}
-
-		SDL_GetCurrentTime(&walltime_work_end);
-		time_elapsed_work = walltime_work_end - walltime_frame_beg;
-
-		if(target_framerate_ns > time_elapsed_work)
-		{
-			switch(delay_type)
-			{
-				case 0:
+				case SDL_EVENT_MOUSE_MOTION:
 				{
-					// busy wait - very precise, but costly
-					walltime_frame_end = walltime_work_end;
-					while(walltime_frame_end - walltime_frame_beg < target_framerate_ns)
-						SDL_GetCurrentTime(&walltime_frame_end);
-
-					time_elapsed_busywait = walltime_frame_end - walltime_work_end;
-					time_elapsed_sleep = 0;
-					break;
-				}
-				case 1:
-				{
-					// simple delay - too imprecise
-					// NOTE: `SDL_Delay` gets milliseconds, but our timer gives us nanoseconds! We need to covert it manually
-					SDL_Delay((target_framerate_ns - time_elapsed_work) / 1000000);
-					SDL_GetCurrentTime(&walltime_frame_end);
-
-					time_elapsed_busywait = 0;
-					time_elapsed_sleep = walltime_frame_end - walltime_frame_beg;
-					break;
-				}
-				case 2:
-				{
-					// delay ns - also too imprecise
-					SDL_DelayNS(target_framerate_ns - time_elapsed_work);
-					SDL_GetCurrentTime(&walltime_frame_end);
-
-					time_elapsed_busywait = 0;
-					time_elapsed_sleep = walltime_frame_end - walltime_frame_beg;
-					break;
-				}
-				case 3:
-				{
-					// delay precise
-					SDL_DelayPrecise(target_framerate_ns - time_elapsed_work);
-					SDL_GetCurrentTime(&walltime_frame_end);
-
-					time_elapsed_busywait = 0;
-					time_elapsed_sleep = walltime_frame_end - walltime_frame_beg;
-					break;
-				}
-				case 4:
-				{
-					// custom delay - we use the sleeping delay with an arbitrary margin, then we busywait what's left
-					const Uint64 sleep_safety_margin = 1000000; // ie, 1ms
-					SDL_Time walltime_sleep_end;
-					
-					SDL_DelayNS(target_framerate_ns - time_elapsed_work - sleep_safety_margin);
-					SDL_GetCurrentTime(&walltime_sleep_end);
-					walltime_frame_end = walltime_sleep_end;
-
-					while(walltime_frame_end - walltime_frame_beg < target_framerate_ns)
-						SDL_GetCurrentTime(&walltime_frame_end);
-
-					time_elapsed_busywait = walltime_frame_end - walltime_sleep_end;
-					time_elapsed_sleep = walltime_sleep_end - walltime_work_end;
-					break;
-				}
-			}
-		}
-
-		time_elapsed_frame = walltime_frame_end - walltime_frame_beg;
-
-		SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
-		SDL_RenderDebugTextFormat(renderer, 10.0f, 10.0f, "elapsed (frame): %9.6f ms", (float)time_elapsed_frame/(float)1000000);
-		SDL_RenderDebugTextFormat(renderer, 10.0f, 20.0f, "elapsed(work   : %9.6f ms", (float)time_elapsed_work/(float)1000000);
-		SDL_RenderDebugTextFormat(renderer, 10.0f, 30.0f, "delay type: %d (change with 1-5)", delay_type + 1);
-
-		SDL_RenderDebugTextFormat(renderer, 10.0f, 50.0f, "time spent sleeping   : %9.6f ms", (float)time_elapsed_sleep/(float)1000000);
-		SDL_RenderDebugTextFormat(renderer, 10.0f, 60.0f, "time spent busywaiting: %9.6f ms", (float)time_elapsed_busywait/(float)1000000);
-
-		player_1.move(time_elapsed_frame);
-		player_2.move(time_elapsed_frame);
-
-		for (NPC * npc : npcs)
-		{
-			
-			npc->move(time_elapsed_frame);
-			npc->border_collision(window_w, window_h);
-		}
-		
-		player_1.border_collision();
-		player_2.border_collision();
-
-		for (NPC* npc : npcs)
-		{
-			if (!gave_over){
-				player_1.npc_collision(npc);
-				player_2.npc_collision(npc);
-			}	
-		}
-
-		// render
-		SDL_RenderPresent(renderer);
-		
-		//walltime_frame_beg = walltime_frame_end;
-
-		// NOTE: while taking the time two different times is no ideal, in the current setup we have a problem:
-		//       our `time_elapsed_frame` doesn't take into account the time it takes to render the debug view, AND
-		//       to "present" the graphics. Usually that is not a big deal, but if if the untimed stuff takes too long
-		//       we end up in a death spiral! Our options are:
-		//       - take the time again after everything has been done (which means the time logged will be slightly lower)
-		//       - show the elapsed time from the previous frame
-		//       we will go with the first option here
-		// walltime_frame_beg = walltime_frame_end;
-		SDL_GetCurrentTime(&walltime_frame_beg);
-	}
-
-	// NOTE: we created a bunch of resources (window, renderer). Should we explicitely destroy them here?
-	//       it's actually not a trivial question!
 	
-	return 0;
-};
+					vec2f world_point = itu_lib_context_point_screen_to_window(&context, context.mouse_pos);
+					//SDL_Log("WORLD: MOUSE POS: X, %f, POS: Y, %f", world_point.x, world_point.y);
+					//SDL_Log("CAMERA: MOUSE POS: X, %f, POS: Y, %f", context.mouse_pos.x, context.mouse_pos.y);
+					context.mouse_pos.x = event.motion.x;
+					context.mouse_pos.y = event.motion.y;
+					vec2f point = itu_lib_context_point_screen_to_global(&context, context.mouse_pos);
+					//SDL_Log("SCREEN: MOUSE POS: X, %f, POS: Y, %f", point.x, point.y);
+					//SDL_Log("SCREEN FLOORED: MOUSE POS: X, %f, POS: Y, %f", floorf(point.x), floor(point.y));
+					
+					
+					context.mouse_delta.x = event.motion.xrel;
+					context.mouse_delta.y = event.motion.yrel;
+					break;
+				}
+				case SDL_EVENT_KEY_DOWN:
+				case SDL_EVENT_KEY_UP:
+					switch(event.key.key)
+					{
+						case SDLK_W: itu_lib_input_key_process(&context, BTN_TYPE_UP, &event);        break;
+						case SDLK_A: itu_lib_input_key_process(&context, BTN_TYPE_LEFT, &event);      break;
+						case SDLK_S: itu_lib_input_key_process(&context, BTN_TYPE_DOWN, &event);      break;
+						case SDLK_D: itu_lib_input_key_process(&context, BTN_TYPE_RIGHT, &event);     break;
+						case SDLK_Q: itu_lib_input_key_process(&context, BTN_TYPE_ACTION_0, &event);  break;
+						case SDLK_E: itu_lib_input_key_process(&context, BTN_TYPE_ACTION_1, &event);  break;
+						case SDLK_SPACE: itu_lib_input_key_process(&context, BTN_TYPE_SPACE, &event); break;
+					}
+
+					// debug keys
+					if(event.key.down && !event.key.repeat)
+					{
+						switch(event.key.key)
+						{
+							case SDLK_TAB: game_reset(&context, &state); break;
+							case SDLK_F1: DEBUG_render_textures = !DEBUG_render_textures; break;
+							case SDLK_F2: DEBUG_render_outlines = !DEBUG_render_outlines; break;
+						}
+					}
+					break;
+			}
+		}
+
+		SDL_SetRenderDrawColor(context.renderer, 0x00, 0x00, 0x00, 0x00);
+		SDL_RenderClear(context.renderer);
+
+		// update
+		game_update(&context, &state);
+		game_render(&context, &state);
+		
+#ifdef ENABLE_DIAGNOSTICS
+		{
+			SDL_SetRenderDrawColor(context.renderer, 0x0, 0x00, 0x00, 0xCC);
+			SDL_FRect rect = SDL_FRect{ 5, 5, 225, 55 };
+			SDL_RenderFillRect(context.renderer, &rect);
+
+			SDL_SetRenderDrawColor(context.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+			SDL_RenderDebugTextFormat(context.renderer, 10, 10, "work: %9.6f ms/f", (float)context.elapsed_work  / (float)MILLIS(1));
+			SDL_RenderDebugTextFormat(context.renderer, 10, 20, "tot : %9.6f ms/f", (float)context.elapsed_frame / (float)MILLIS(1));
+			SDL_RenderDebugTextFormat(context.renderer, 10, 30, "[TAB] reset ");
+			SDL_RenderDebugTextFormat(context.renderer, 10, 40, "[F1]  render textures   %s", DEBUG_render_textures   ? " ON" : "OFF");
+			SDL_RenderDebugTextFormat(context.renderer, 10, 50, "[F2]  render outlines   %s", DEBUG_render_outlines   ? " ON" : "OFF");
+		}
+#endif
+		// render
+		SDL_RenderPresent(context.renderer);
+
+		itu_lib_context_frame_timing_update(&context);
+	}
+}

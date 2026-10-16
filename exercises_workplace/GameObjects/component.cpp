@@ -1,6 +1,5 @@
 #include "gameObject.hpp"
 #include "component.hpp"
-#include <iostream>
 
 
 

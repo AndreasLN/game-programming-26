@@ -1,5 +1,11 @@
+#ifndef COMPONENT
+#define COMPONENT
+
 
 #include <itu_engine.hpp>
+#include <iostream>
+
+using namespace std;
 
 class GameObject;
 
@@ -15,5 +21,7 @@ class Component{
     string GetName() { return name; };
     void Print();
 };
+
+#endif
 
 

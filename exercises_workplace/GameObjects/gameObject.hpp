@@ -1,4 +1,7 @@
 
+#ifndef GAMEOBJECT
+#define GAMEOBJECT
+
 #include <itu_engine.hpp>
 
 using namespace std;
@@ -26,8 +29,7 @@ class GameObject{
     vector<GameObject*> GetChildren() {return children; };
     vector<Component*> GetComponents() {return components; };
     
-    template<typename T>
-    T GetComponentofType() {};
+    template<typename T> T* GetComponentofType(string name);
 
 
     void AddComponent(Component * component);
@@ -38,4 +40,4 @@ class GameObject{
     void Print();
 };
 
-
+#endif

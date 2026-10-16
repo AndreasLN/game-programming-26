@@ -1,3 +1,6 @@
+#ifndef SPRITE2D
+#define SPRITE2D
+
 #include <itu_engine.hpp>
 #include "monobehavior.hpp"
 #include "itu_lib_render2d.hpp"
@@ -18,3 +21,6 @@ class Sprite2D : public MonoBehavior{
     void RectRender(SDL_Renderer * renderer);
     void Print();
 };
+
+
+#endif

@@ -1,3 +1,7 @@
+#ifndef PLAYER
+#define PLAYER
+
+
 #include <itu_engine.hpp>
 #include "monobehavior.hpp"
 #include "itu_lib_render2d.hpp"
@@ -21,3 +25,5 @@ class Player : public MonoBehavior {
         void Print();
 		
 };
+
+#endif

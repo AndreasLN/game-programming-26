@@ -1,3 +1,6 @@
+#ifndef MONOBEHAVIOR
+#define MONOBEHAVIOR
+
 
 #include <itu_engine.hpp>
 #include "component.hpp"
@@ -14,4 +17,4 @@ class MonoBehavior : public Component{
     void Print();
 };
 
-
+#endif
