@@ -1,6 +1,4 @@
-#include "gameObject.hpp"
-#include "component.hpp"
-
+#include <gameObjectsLib.hpp>
 
 
 Component::Component(GameObject &gameObject)

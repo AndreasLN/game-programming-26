@@ -1,10 +1,5 @@
 #include <iostream>
-#include "gameObject.hpp"
-
-#include "component.hpp"
-#include "monobehavior.hpp"
-#include "player.hpp"
-#include "sprite2D.hpp"
+#include <gameObjectsLib.hpp>
 
 
 Player::Player(GameObject &gameObject, float player_size, double speed) : MonoBehavior(gameObject)

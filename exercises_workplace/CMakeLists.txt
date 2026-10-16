@@ -16,6 +16,7 @@ foreach(file_src ${file_src_list})
 
 	# add extra include paths that we will need along the course
 	# (not all dependencies are compiled, so those we need to look for explicitely)
+	target_include_directories(${targetname} PRIVATE ${CMAKE_SOURCE_DIR}/lib/GameObjects)
 	target_include_directories(${targetname} PRIVATE ${CMAKE_SOURCE_DIR}/lib/itu)
 	target_include_directories(${targetname} PRIVATE ${CMAKE_SOURCE_DIR}/lib/stb)
 	target_include_directories(${targetname} PRIVATE ${CMAKE_SOURCE_DIR}/lib/imgui)

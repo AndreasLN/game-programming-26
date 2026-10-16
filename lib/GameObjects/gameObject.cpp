@@ -1,12 +1,18 @@
 #include <iostream>
 
-#include "gameObject.hpp"
-#include "component.hpp"
+#include <gameObjectsLib.hpp>
 
 #include <stdexcept>
 
 
 GameObject::GameObject(GameObject * parent = nullptr, string name, vec2f pos = {0, 0}) 
+{
+    this->parent = parent;
+    this->name = name;
+    this->pos = pos;
+}
+
+GameObject::GameObject() 
 {
     this->parent = parent;
     this->name = name;

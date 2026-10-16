@@ -1,12 +1,9 @@
 #include <iostream>
-#include "gameObject.hpp"
-
-#include "component.hpp"
-#include "monobehavior.hpp"
-#include "sprite2D.hpp"
+#include <gameObjectsLib.hpp>
 
 Sprite2D::Sprite2D(GameObject &gameObject, SDL_FRect rect) : MonoBehavior(gameObject)
 {
+    this->name = "Sprite2D";
     this->rect = rect;
 }
 
@@ -18,6 +15,9 @@ Sprite2D::Sprite2D(GameObject &gameObject, SDL_FRect rect, Uint8 r, Uint8 g, Uin
     this->g = g;
     this->b = b;
     this->a = a;
+
+    gameObject.AddComponent(this);
+
 }
 
 void Sprite2D::RectRender(SDL_Renderer * renderer)

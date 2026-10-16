@@ -2,7 +2,7 @@
 
 #include <itu_engine.hpp>
 
-#include "GameObjects/gameObjectsLib.hpp"
+#include <gameObjectsLib.hpp>
 
 
 using namespace std;
@@ -174,6 +174,20 @@ static void game_init(EngineContext* context, E03_GameState* state)
 	// texture atlases
 	state->atlas = itu_resources_texture_create(context, "data/kenney/tiny_dungeon_packed.png", SDL_SCALEMODE_NEAREST);
 	state->bg    = itu_resources_texture_create(context, "data/kenney/prototype_texture_dark/texture_13.png", SDL_SCALEMODE_NEAREST);
+
+	GameObject * root = new GameObject(nullptr, "root", {0,0});
+
+	root->GetParent();
+	root->AddChild(root);
+	
+	//GameObject * child = new GameObject(root, "child", {0,0});
+
+	//SDL_FRect sprite2d_rect = SDL_FRect{ 0, 0, 1024, 1024};
+
+	//Component * sprite2d = new Sprite2D(*child, sprite2d_rect);
+
+	//SDL_Log("%s", sprite2d->GetName());
+
 }
 
 static void mouse_tint(EngineContext* context, E03_GameState* state){
