@@ -2,14 +2,9 @@
 #include <gameObjectsLib.hpp>
 
 
-Player::Player(GameObject &gameObject, float player_size, double speed, EngineContext * context) : MonoBehavior(gameObject)
+Player::Player(GameObject &gameObject, double speed, EngineContext * context) : Character(gameObject, speed, context)
 {
     this->name = "Player";
-    this->horizontal = 0;
-    this->vertical = 0;
-    this->speed = speed;
-    this->direction = RIGHT;
-    this->context = context;
 }
 
 
@@ -22,8 +17,6 @@ void Player::Start()
 { 
     this->sprite = this->gameObject.GetComponentofType<Sprite2D>("Sprite2D");
 }
-
-
 
 void Player::Update(float delta)
 {

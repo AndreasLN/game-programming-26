@@ -7,6 +7,7 @@
 #include <sprite2D.hpp>
 #include <player.hpp>
 #include <rendered.hpp>
+#include <character.hpp>
 
 
 #ifndef IN_IDE
@@ -15,7 +16,9 @@
 	#include <monobehavior.cpp>
 	#include <rendered.cpp>
 	#include <sprite2D.cpp>
-    #include <player.cpp>
+    #include <character.cpp>
+	#include <player.cpp>
+	
 #endif // IN_IDE
 
 #endif

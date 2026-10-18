@@ -323,7 +323,7 @@ static void game_reset(EngineContext* context, E06_GameState* state)
 	child->transform.scale = VEC2F_ONE;
 	child->transform.rotation = 0;	
 
-	Player * playerComponent = new Player(*child, guy.w, PLAYER_SPEED, context);
+	Player * playerComponent = new Player(*child, PLAYER_SPEED, context);
 	create_monobehavior_script(state, playerComponent);
 
 	sprite2d->Print();
