@@ -17,6 +17,7 @@ using namespace std;
 bool DEBUG_render_textures = true;
 bool DEBUG_render_outlines = true;
 const int ENTITY_COUNT = 4096;
+const int PLAYER_SPEED = 2;
 
 enum Direction{
 	LEFT,
@@ -31,27 +32,27 @@ enum NPCSTATE{
 	IDLE,
 };
 
-struct E03_Entity
+struct E06_Entity
 {
 	Sprite sprite;
 	Transform2D transform;
 
-	E03_Entity() {
+	E06_Entity() {
 	}
 
-	E03_Entity(Sprite sprite, Transform2D  transform) 
+	E06_Entity(Sprite sprite, Transform2D  transform) 
 	: sprite(sprite), transform(transform) {}
 
 };
 
-struct E03_Character_Entity: public E03_Entity
+struct E06_Character_Entity: public E06_Entity
 {
 	Direction direction;
 
-	E03_Character_Entity() {}
+	E06_Character_Entity() {}
 
-	E03_Character_Entity(Sprite  sprite, Transform2D  transform, Direction direction = DOWN)
-	: E03_Entity(sprite, transform), direction(direction) {}
+	E06_Character_Entity(Sprite  sprite, Transform2D  transform, Direction direction = DOWN)
+	: E06_Entity(sprite, transform), direction(direction) {}
 
 };
 
@@ -67,16 +68,16 @@ struct Random_Timer
 
 };
 
-struct E03_CharacterNPC_Entity: public E03_Character_Entity
+struct E06_CharacterNPC_Entity: public E06_Character_Entity
 {
 	Random_Timer * idle_timer;
 	Random_Timer * moving_timer;
 	NPCSTATE state;
 
-	E03_CharacterNPC_Entity() {}
+	E06_CharacterNPC_Entity() {}
 
-	E03_CharacterNPC_Entity(Sprite sprite, Transform2D transform, Direction direction, Random_Timer * idle, Random_Timer * moving)
-	: E03_Character_Entity(sprite, transform, direction), idle_timer(idle), moving_timer(moving) {state = IDLE;}
+	E06_CharacterNPC_Entity(Sprite sprite, Transform2D transform, Direction direction, Random_Timer * idle, Random_Timer * moving)
+	: E06_Character_Entity(sprite, transform, direction), idle_timer(idle), moving_timer(moving) {state = IDLE;}
 };
 
 
@@ -100,9 +101,9 @@ bool operator==(const vec2f& lhs, const vec2f& rhs)
 	}
 };
 
-struct E03_TileMap
+struct E06_TileMap
 {
-	map<vec2f, E03_Entity*> entities; // easier lookup for entities in tilemap;
+	map<vec2f, E06_Entity*> entities; // easier lookup for entities in tilemap;
 	map<vec2f, SDL_FRect> map; // Each sprite has unique transform
 	Transform2D transform;
 };
@@ -123,15 +124,18 @@ map<vec2f, SDL_FRect> map_example = {
 };
 
 
-struct E03_GameState
+struct E06_GameState
 {
 	// shortcut references
-	E03_Character_Entity* player;
-	E03_TileMap* tilemap;
+	E06_Character_Entity* player;
+	E06_TileMap* tilemap;
 
 	// game-allocated memory
-	list<E03_Entity*> entities;
-	list<E03_CharacterNPC_Entity*> npcs;
+	list<E06_Entity*> entities;
+	list<E06_CharacterNPC_Entity*> npcs;
+
+	vector<MonoBehavior*> starts;
+	vector<MonoBehavior*> updates;
 	int entities_alive_count;
 
 	// SDL-allocated structures
@@ -139,7 +143,12 @@ struct E03_GameState
 	SDL_Texture* bg;
 };
 
-static void entity_create(E03_GameState* state, E03_Entity * entity)
+static void create_monobehavior_script(E06_GameState* state, MonoBehavior * script)
+{
+	state->starts.push_back(script);
+}
+
+static void entity_create(E06_GameState* state, E06_Entity * entity)
 {
 	if(!(state->entities_alive_count < ENTITY_COUNT))
 		// NOTE: this might as well be an assert, if we don't have a way to recover/handle it
@@ -157,7 +166,7 @@ static void entity_create(E03_GameState* state, E03_Entity * entity)
 // NOTE: this only works if nobody holds references to other entities!
 //       if that were the case, we couldn't swap them around.
 //       We will see in later lectures how to handle this kind of problems
-static void entity_destroy(E03_GameState* state, E03_Entity* entity)
+static void entity_destroy(E06_GameState* state, E06_Entity* entity)
 {
 	// NOTE: here we want to fail hard, nobody should pass us a pointer not gotten from `entity_create()`
 	
@@ -165,7 +174,25 @@ static void entity_destroy(E03_GameState* state, E03_Entity* entity)
 	state->entities.remove(entity);
 }
 
-static void game_init(EngineContext* context, E03_GameState* state)
+static void Start(E06_GameState* state){
+	
+	for (size_t i = 0; i < state->starts.size(); ++i)
+	{
+		state->updates[i]->Start();
+	}
+
+	state->starts.clear();
+}
+
+static void Update(EngineContext* context, E06_GameState* state){
+	for (size_t i = 0; i < state->updates.size(); ++i)
+	{
+		state->updates[i]->Update(context->delta);
+	}
+	
+}
+
+static void game_init(EngineContext* context, E06_GameState* state)
 {
 	// allocate memory
 	state->entities = { };
@@ -175,21 +202,38 @@ static void game_init(EngineContext* context, E03_GameState* state)
 	state->atlas = itu_resources_texture_create(context, "data/kenney/tiny_dungeon_packed.png", SDL_SCALEMODE_NEAREST);
 	state->bg    = itu_resources_texture_create(context, "data/kenney/prototype_texture_dark/texture_13.png", SDL_SCALEMODE_NEAREST);
 
+	state->updates = { };
+	state->starts = { };
+
+
 	GameObject * root = new GameObject(nullptr, "root", {0,0});
 
 	GameObject * child = new GameObject(root, "child", {0,0});
 
 	SDL_FRect sprite2d_rect = SDL_FRect{ 0, 0, 1024, 1024};
 
+	SDL_Log("%i", child->GetComponents().size()) ;
+	
 	Sprite2D * sprite2d = new Sprite2D(*child, sprite2d_rect);
+	create_monobehavior_script(state, sprite2d);
 
+	SDL_Log("%i", child->GetComponents().size()) ;
 	
-	
+	Sprite2D * childComponent = child->GetComponentofType<Sprite2D>(sprite2d->GetName());
+
+
+	Player * playerComponent = new Player(*child, guy.w, PLAYER_SPEED);
+	create_monobehavior_script(state, playerComponent);
+
 	sprite2d->Print();
+
+	childComponent->Print();
+
+	Start(state);
 
 }
 
-static void mouse_tint(EngineContext* context, E03_GameState* state){
+static void mouse_tint(EngineContext* context, E06_GameState* state){
 		// TINT WITH MOUSE
 		vec2f point = itu_lib_context_point_screen_to_global(context, context->mouse_pos);
 		try
@@ -202,12 +246,12 @@ static void mouse_tint(EngineContext* context, E03_GameState* state){
 		}
 }
 
-static void game_reset(EngineContext* context, E03_GameState* state)
+static void game_reset(EngineContext* context, E06_GameState* state)
 {
 	state->entities_alive_count = 0;
 	// entities
 	{
-		E03_Entity * bg = new E03_Entity();
+		E06_Entity * bg = new E06_Entity();
 
 		entity_create(state, bg);
 		SDL_FRect sprite_rect = SDL_FRect{ 0, 0, 1024, 1024};
@@ -223,14 +267,14 @@ static void game_reset(EngineContext* context, E03_GameState* state)
 
 	// TILEMAP
 	{
-		state->tilemap = new E03_TileMap();
+		state->tilemap = new E06_TileMap();
 		state->tilemap->transform.position = VEC2F_ZERO;
 		state->tilemap->transform.scale = VEC2F_ONE;
 		state->tilemap->map = map_example;
 		state->tilemap->entities = {};
 
 		for(auto pair : state->tilemap->map){
-			E03_Entity* entity = new E03_Entity();
+			E06_Entity* entity = new E06_Entity();
 			entity_create(state, entity);
 			entity->transform.scale = state->tilemap->transform.scale;
 			entity->transform.position = state->tilemap->transform.position + pair.first;
@@ -253,7 +297,7 @@ static void game_reset(EngineContext* context, E03_GameState* state)
 		for(int i = 0 ; i < 10; ++i){
 			Random_Timer * idle = new Random_Timer(1, 3);
 			Random_Timer * moving = new Random_Timer(2, 4);
-			E03_CharacterNPC_Entity* npc = new E03_CharacterNPC_Entity();
+			E06_CharacterNPC_Entity* npc = new E06_CharacterNPC_Entity();
 			entity_create(state, npc);
 			npc->idle_timer = idle;
 			npc->moving_timer = moving;
@@ -273,7 +317,7 @@ static void game_reset(EngineContext* context, E03_GameState* state)
 
 
 	{
-		state->player = new E03_Character_Entity();
+		state->player = new E06_Character_Entity();
 		entity_create(state, state->player);
 		state->player->transform.position = VEC2F_ZERO;
 		state->player->transform.scale = VEC2F_ONE;
@@ -289,12 +333,12 @@ static void game_reset(EngineContext* context, E03_GameState* state)
 	}
 }
 
-static void game_update(EngineContext* context, E03_GameState* state)
+static void game_update(EngineContext* context, E06_GameState* state)
 {
 	{
 		const float player_speed = 2;
 
-		E03_Entity* entity = state->player;
+		E06_Entity* entity = state->player;
 		vec2f mov = { 0 };
 		if(context->btn_isdown_up){
 			mov.y += 1;
@@ -328,7 +372,7 @@ static void game_update(EngineContext* context, E03_GameState* state)
 
 	const float npc_speed = 1.5;
 
-	for(E03_CharacterNPC_Entity * npc : state->npcs){
+	for(E06_CharacterNPC_Entity * npc : state->npcs){
 		vec2f mov = { 0 };
 		//SDL_Log("%d", npc->state);
 		switch (npc->state)
@@ -387,9 +431,9 @@ static void game_update(EngineContext* context, E03_GameState* state)
 
 }
 
-static void game_render(EngineContext* context, E03_GameState* state)
+static void game_render(EngineContext* context, E06_GameState* state)
 {
-	for(E03_Entity * entity : state->entities)
+	for(E06_Entity * entity : state->entities)
 	{
 		// render texture
 		SDL_FRect rect_src = entity->sprite.rect;
@@ -420,7 +464,7 @@ int main(void)
 	bool quit = false;
 	SDL_Window* window;
 	EngineContext context = { 0 };
-	E03_GameState  state   = { 0 };
+	E06_GameState  state   = { 0 };
 
 	itu_lib_context_init(&config, &context);
 	itu_lib_context_set_active_camera(&context, &context.camera_default);

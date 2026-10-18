@@ -17,7 +17,7 @@ class Sprite2D : public MonoBehavior{
 
     void Awake();
     void Start();
-    void Update(SDL_Time time_elapsed_frame);
+    void Update(float delta);
     void RectRender(SDL_Renderer * renderer);
     void Print();
 };

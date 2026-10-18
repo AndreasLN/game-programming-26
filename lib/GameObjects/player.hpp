@@ -19,9 +19,9 @@ class Player : public MonoBehavior {
         Player(GameObject &gameObject); // Constructor with parameters}
 		Player(GameObject &gameObject, float player_size, double speed); // Constructor with parameters}
 		
-        void Update(SDL_Time time_elapsed_frame);
+        void Update(float delta);
         void Start();
-        void Move(SDL_Time time_elapsed_frame);
+        void Move(float delta);
 		void BorderCollision();
         void Print();
 		

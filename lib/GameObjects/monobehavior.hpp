@@ -13,7 +13,7 @@ class MonoBehavior : public Component{
         MonoBehavior(GameObject &gameObject);
         void Awake();
         void Start();
-        void Update(SDL_Time time_elapsed_frame);
+        void Update(float delta);
         void Print();
 };
 

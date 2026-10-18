@@ -29,7 +29,7 @@ void Sprite2D::Print()
     std::cout << "This is a Sprite2D class";
 }
 
-void Sprite2D::Update(SDL_Time time_elapsed_frame)
+void Sprite2D::Update(float delta)
 {
     rect.x = gameObject.GetPos().x;
     rect.y = gameObject.GetPos().y;
