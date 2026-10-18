@@ -3,9 +3,11 @@
 
 #include <itu_engine.hpp>
 #include "monobehavior.hpp"
+#include "rendered.hpp"
 #include "itu_lib_render2d.hpp"
 
-class Sprite2D : public MonoBehavior{
+class Sprite2D : public MonoBehavior, public Rendered
+{
     private:
     Uint8 r = 0x00, g = 0x00, b = 0x00, a = 0XFF;
     SDL_FRect rect;
@@ -21,6 +23,7 @@ class Sprite2D : public MonoBehavior{
     void Update(float delta) override;
     void RectRender(SDL_Renderer * renderer);
     void Print();
+    void Render(EngineContext * context);
 };
 
 

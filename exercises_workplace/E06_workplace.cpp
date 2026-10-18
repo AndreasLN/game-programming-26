@@ -135,6 +135,7 @@ struct E06_GameState
 
 	vector<MonoBehavior*> starts;
 	vector<MonoBehavior*> updates;
+	vector<Rendered*> renders;
 
 	int entities_alive_count;
 
@@ -148,6 +149,12 @@ static void create_monobehavior_script(E06_GameState* state, MonoBehavior * scri
 	state->starts.push_back(script);
 	script->Awake();
 }
+
+static void add_to_render(E06_GameState* state, Rendered * script)
+{
+	state->renders.push_back(script);
+}
+
 
 static void entity_create(E06_GameState* state, E06_Entity * entity)
 {
@@ -193,6 +200,13 @@ static void Update(EngineContext* context, E06_GameState* state){
 	
 }
 
+static void Render(EngineContext* context, E06_GameState* state){
+	for (size_t i = 0; i < state->renders.size(); i++)
+	{
+		state->renders[i]->Render(context);
+	}
+}
+
 static void game_init(EngineContext* context, E06_GameState* state)
 {
 	// allocate memory
@@ -205,10 +219,6 @@ static void game_init(EngineContext* context, E06_GameState* state)
 
 	state->updates = { };
 	state->starts = { };
-
-
-	
-
 }
 
 static void mouse_tint(EngineContext* context, E06_GameState* state){
@@ -303,6 +313,7 @@ static void game_reset(EngineContext* context, E06_GameState* state)
 	
 	Sprite2D * sprite2d = new Sprite2D(*child, state->atlas, {1, 10, 16, 16});
 	create_monobehavior_script(state, sprite2d);
+	add_to_render(state, sprite2d);
 
 	SDL_Log("%i", child->GetComponents().size()) ;
 	
@@ -409,6 +420,8 @@ static void game_render(EngineContext* context, E06_GameState* state)
 		
 		entity->sprite.tint.r = 1;
 	}
+
+	Render(context, state);
 
 	// debug window
 	SDL_SetRenderDrawColor(context->renderer, 0xFF, 0x00, 0xFF, 0xff);
