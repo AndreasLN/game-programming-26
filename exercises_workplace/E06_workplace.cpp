@@ -27,10 +27,7 @@ bool DEBUG_render_outlines = true;
 const int ENTITY_COUNT = 4096;
 const int PLAYER_SPEED = 2;
 
-enum NPCSTATE{
-	MOVING,
-	IDLE,
-};
+
 
 struct E06_Entity
 {
@@ -45,40 +42,6 @@ struct E06_Entity
 
 };
 
-struct E06_Character_Entity: public E06_Entity
-{
-	Direction direction;
-
-	E06_Character_Entity() {}
-
-	E06_Character_Entity(Sprite  sprite, Transform2D  transform, Direction direction = D_DOWN)
-	: E06_Entity(sprite, transform), direction(direction) {}
-
-};
-
-struct Random_Timer
-{
-	float min;
-	float max;
-
-	float time = 2;
-
-	Random_Timer(float min, float max) 
-	: min(min), max(max) {time = 2;}
-
-};
-
-struct E06_CharacterNPC_Entity: public E06_Character_Entity
-{
-	Random_Timer * idle_timer;
-	Random_Timer * moving_timer;
-	NPCSTATE state;
-
-	E06_CharacterNPC_Entity() {}
-
-	E06_CharacterNPC_Entity(Sprite sprite, Transform2D transform, Direction direction, Random_Timer * idle, Random_Timer * moving)
-	: E06_Character_Entity(sprite, transform, direction), idle_timer(idle), moving_timer(moving) {state = IDLE;}
-};
 
 
 
@@ -131,7 +94,6 @@ struct E06_GameState
 
 	// game-allocated memory
 	list<E06_Entity*> entities;
-	list<E06_CharacterNPC_Entity*> npcs;
 
 	vector<MonoBehavior*> starts;
 	vector<MonoBehavior*> updates;
@@ -279,30 +241,6 @@ static void game_reset(EngineContext* context, E06_GameState* state)
 		}
 	}
 
-	
-	// NPC
-	{
-		for(int i = 0 ; i < 10; ++i){
-			Random_Timer * idle = new Random_Timer(1, 3);
-			Random_Timer * moving = new Random_Timer(2, 4);
-			E06_CharacterNPC_Entity* npc = new E06_CharacterNPC_Entity();
-			entity_create(state, npc);
-			npc->idle_timer = idle;
-			npc->moving_timer = moving;
-			npc->transform.scale = VEC2F_ONE;
-			npc->transform.position = VEC2F_ONE;
-			npc->transform.rotation = 0;
-			npc->state = IDLE;
-			itu_lib_sprite_init(
-				&npc->sprite,
-				state->atlas,
-				itu_lib_sprite_get_source_rect(guy.x, guy.y, guy.w, guy.h)
-			);
-			//npc->sprite.pivot.y = 0.3f;
-			state->npcs.push_front(npc);
-		}
-	}
-	
 	GameObject * root = new GameObject(nullptr, "root", {0,0});
 
 	GameObject * child = new GameObject(root, "child", {0,0});
@@ -330,11 +268,26 @@ static void game_reset(EngineContext* context, E06_GameState* state)
 
 	childComponent->Print();
 
-	Start(state);
 
+	// NPC
 	{
-		
+		for(int i = 0 ; i < 5; ++i){
+			GameObject * npc = new GameObject(root, "child" + i, {0,0});
+
+			npc->transform.position = VEC2F_ZERO;
+			npc->transform.scale = VEC2F_ONE;
+			npc->transform.rotation = 0;	
+			
+			Sprite2D * npc_sprite2d = new Sprite2D(*npc, state->atlas, {guy.x, guy.y, guy.w, guy.h});
+			create_monobehavior_script(state, npc_sprite2d);
+			add_to_render(state, npc_sprite2d);
+			
+			NPC * ncpComponent = new NPC(*npc, 1.5, context);
+			create_monobehavior_script(state, ncpComponent);
+
+		}
 	}
+
 }
 
 static void game_update(EngineContext* context, E06_GameState* state)
@@ -344,63 +297,6 @@ static void game_update(EngineContext* context, E06_GameState* state)
 	}
 
 	const float npc_speed = 1.5;
-
-	for(E06_CharacterNPC_Entity * npc : state->npcs){
-		vec2f mov = { 0 };
-		//SDL_Log("%d", npc->state);
-		switch (npc->state)
-		{
-			case IDLE:
-
-				if (npc->idle_timer->time > 0.0f){
-					npc->idle_timer->time -= context->delta;
-				}
-				else{
-					npc->state = MOVING;
-					npc->moving_timer->time = npc->moving_timer->max + SDL_randf() * (npc->moving_timer->min - npc->moving_timer->max);
-					npc->direction = Direction(SDL_rand(LAST - 1));
-
-				}
-				break;
-			case MOVING:
-				if (npc->moving_timer->time > 0){
-					switch (npc->direction)
-					{
-					case D_UP:
-						mov.y += 1;
-						break;
-					case D_DOWN:
-						mov.y -= 1;
-						break;
-					case D_LEFT:
-						mov.x -= 1;
-						break;
-					case D_RIGHT:
-						mov.x += 1;
-						break;
-					default:
-						break;
-					}
-					if(npc->direction == D_LEFT && !npc->sprite.flip_horizontal){
-						npc->sprite.flip_horizontal = true;
-					}
-					else if (npc->direction == D_RIGHT && npc->sprite.flip_horizontal){
-						npc->sprite.flip_horizontal = false;
-					}
-
-					npc->transform.position = npc->transform.position + mov * (npc_speed * context->delta);
-					npc->moving_timer->time -= context->delta;
-				}
-				else{
-					npc->state = IDLE;
-					npc->idle_timer->time = npc->idle_timer->max + SDL_randf() * (npc->idle_timer->min - npc->idle_timer->max);
-				}
-				break;
-
-			default:
-				break;
-			}
-	}
 
 }
 
@@ -447,6 +343,8 @@ int main(void)
 
 	game_init(&context, &state);
 	game_reset(&context, &state);
+	
+	Start(&state);
 
 	itu_lib_context_frame_timing_setup(&context);
 

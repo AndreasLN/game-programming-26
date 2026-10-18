@@ -15,7 +15,7 @@ void Player::Print()
 
 void Player::Start()
 { 
-    this->sprite = this->gameObject.GetComponentofType<Sprite2D>("Sprite2D");
+    Character::Start();
 }
 
 void Player::Update(float delta)

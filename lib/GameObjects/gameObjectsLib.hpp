@@ -8,7 +8,7 @@
 #include <player.hpp>
 #include <rendered.hpp>
 #include <character.hpp>
-
+#include <npc.hpp>
 
 #ifndef IN_IDE
 	#include <gameObject.cpp>
@@ -18,6 +18,7 @@
 	#include <sprite2D.cpp>
     #include <character.cpp>
 	#include <player.cpp>
+	#include <npc.cpp>
 	
 #endif // IN_IDE
 
