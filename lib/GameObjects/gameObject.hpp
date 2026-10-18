@@ -7,13 +7,13 @@
 using namespace std;
 #include <vector>
 
-class Component;
+class MonoBehavior;
 
 class GameObject{
     private:
     Transform2D transform;
     vec2f pos;
-    vector<Component*> components;
+    vector<MonoBehavior*> components;
     GameObject * parent; // can be null
     vector<GameObject*> children;
     string name;
@@ -27,17 +27,21 @@ class GameObject{
     GameObject * GetParent() {return parent; };
     vec2f GetPos() {return pos; };
     vector<GameObject*> GetChildren() {return children; };
-    vector<Component*> GetComponents() {return components; };
+    vector<MonoBehavior*> GetComponents() {return components; };
     
     template<typename T> T* GetComponentofType(string name);
 
+    friend bool operator==(const GameObject& lhs, const GameObject& rhs);
 
-    void AddComponent(Component * component);
-    void RemoveComponent(Component * component);
+
+    void AddComponent(MonoBehavior * component);
+    void RemoveComponent(MonoBehavior * component);
     void AddChild(GameObject * gameObject);
     void RemoveChild(GameObject * gameObject);
     void Destroy();
     void Print();
+
+    
 };
 
 #endif

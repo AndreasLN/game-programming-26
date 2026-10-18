@@ -177,16 +177,15 @@ static void game_init(EngineContext* context, E03_GameState* state)
 
 	GameObject * root = new GameObject(nullptr, "root", {0,0});
 
-	root->GetParent();
-	root->AddChild(root);
+	GameObject * child = new GameObject(root, "child", {0,0});
+
+	SDL_FRect sprite2d_rect = SDL_FRect{ 0, 0, 1024, 1024};
+
+	Sprite2D * sprite2d = new Sprite2D(*child, sprite2d_rect);
+
 	
-	//GameObject * child = new GameObject(root, "child", {0,0});
-
-	//SDL_FRect sprite2d_rect = SDL_FRect{ 0, 0, 1024, 1024};
-
-	//Component * sprite2d = new Sprite2D(*child, sprite2d_rect);
-
-	//SDL_Log("%s", sprite2d->GetName());
+	
+	sprite2d->Print();
 
 }
 
@@ -267,7 +266,6 @@ static void game_reset(EngineContext* context, E03_GameState* state)
 				state->atlas,
 				itu_lib_sprite_get_source_rect(guy.x, guy.y, guy.w, guy.h)
 			);
-			SDL_Log("%d", npc->state);
 			//npc->sprite.pivot.y = 0.3f;
 			state->npcs.push_front(npc);
 		}

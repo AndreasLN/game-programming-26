@@ -18,6 +18,7 @@ class Component{
 
     Component(GameObject &gameObject);
     GameObject GetGameObject();
+    
     string GetName() { return name; };
     void Print();
 };

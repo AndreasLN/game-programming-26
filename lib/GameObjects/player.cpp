@@ -17,10 +17,9 @@ void Player::Print()
 }
 
 void Player::Start()
-{
+{ 
     this->sprite = this->gameObject.GetComponentofType<Sprite2D>("Sprite2D");
 }
-
 
 void Player::Update(SDL_Time time_elapsed_frame)
 {

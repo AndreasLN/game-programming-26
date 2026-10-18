@@ -16,8 +16,6 @@ Sprite2D::Sprite2D(GameObject &gameObject, SDL_FRect rect, Uint8 r, Uint8 g, Uin
     this->b = b;
     this->a = a;
 
-    gameObject.AddComponent(this);
-
 }
 
 void Sprite2D::RectRender(SDL_Renderer * renderer)
@@ -36,8 +34,5 @@ void Sprite2D::Update(SDL_Time time_elapsed_frame)
     rect.x = gameObject.GetPos().x;
     rect.y = gameObject.GetPos().y;
 }
-
-
-
 
 

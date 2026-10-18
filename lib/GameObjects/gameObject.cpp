@@ -3,9 +3,10 @@
 #include <gameObjectsLib.hpp>
 
 #include <stdexcept>
+#include <algorithm>
 
 
-GameObject::GameObject(GameObject * parent = nullptr, string name, vec2f pos = {0, 0}) 
+GameObject::GameObject(GameObject * parent, string name, vec2f pos) 
 {
     this->parent = parent;
     this->name = name;
@@ -19,11 +20,21 @@ GameObject::GameObject()
     this->pos = pos;
 }
 
-void GameObject::AddComponent(Component * component) 
+void GameObject::AddChild(GameObject * gameObject) 
+{
+    this->children.push_back(gameObject);
+    SDL_Log("Added child %s", gameObject->name.c_str());
+};
+
+void GameObject::AddComponent(MonoBehavior * component) 
 {
     this->components.push_back(component);
-    component->Print();
 };
+
+bool operator==(const GameObject& lhs, const GameObject& rhs){
+    return lhs.name == rhs.name;
+}
+
 
 void GameObject::Print(){
     std::cout << this->name;
@@ -51,11 +62,11 @@ template<typename T> T* GameObject::GetComponentofType(string name)
     for (size_t i = 0; i < components.size(); i++)
     {
         if(name.compare(components[i]->GetName()) == 0){
-            return components[i];
+            return static_cast<T*>(components[i]);
         }
     }
 
-    throw runtime_error(&"Could not find Component");
+    throw runtime_error("Could not find Component");
 
 }
 

@@ -8,6 +8,7 @@
 #include "sprite2D.hpp"
 
 class Player : public MonoBehavior {
+	
 	public:
 
 		Sprite2D * sprite;
