@@ -21,3 +21,6 @@ void Character::Start()
     this->sprite = this->gameObject.GetComponentofType<Sprite2D>("Sprite2D");
 }
 
+void Character::Destroy(){
+    delete this;
+}

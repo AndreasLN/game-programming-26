@@ -76,10 +76,11 @@ void NPC::Update(float delta)
 			default:
 				break;
 			}
-
-   
 }
 
+void NPC::Destroy(){
+    delete this;
+}
 
 
 

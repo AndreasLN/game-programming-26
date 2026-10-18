@@ -28,6 +28,8 @@ class Tilemap : public MonoBehavior, public Rendered
     void Update(float delta) override;
     void Print();
     void Render(EngineContext * context);
+    void Destroy();
+
 };
 
 

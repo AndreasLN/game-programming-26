@@ -72,6 +72,8 @@ struct E06_GameState
 	vector<MonoBehavior*> updates;
 	vector<Rendered*> renders;
 
+	GameObject * root;
+
 	// SDL-allocated structures
 	SDL_Texture* atlas;
 	SDL_Texture* bg;
@@ -143,8 +145,16 @@ static void mouse_tint(EngineContext* context, E06_GameState* state){
 static void game_reset(EngineContext* context, E06_GameState* state)
 {
 	
+	if(state->root != nullptr)
+	{
+		state->root->Destroy();
+	}
+	state->updates.clear();
+	state->starts.clear();
+	state->renders.clear();
 	
 	GameObject * root = new GameObject(nullptr, "root", {0,0});
+	state->root = root;
 
 	// Background
 	{
@@ -189,7 +199,6 @@ static void game_reset(EngineContext* context, E06_GameState* state)
 		sprite2d->Print();
 
 	}
-	
 
 	// NPC
 	{
@@ -209,7 +218,6 @@ static void game_reset(EngineContext* context, E06_GameState* state)
 
 		}
 	}
-
 }
 
 static void game_update(EngineContext* context, E06_GameState* state)
@@ -251,7 +259,6 @@ int main(void)
 	game_init(&context, &state);
 	game_reset(&context, &state);
 	
-	Start(&state);
 
 	itu_lib_context_frame_timing_setup(&context);
 
@@ -313,6 +320,7 @@ int main(void)
 		SDL_RenderClear(context.renderer);
 
 		// update
+		Start(&state);
 		game_update(&context, &state);
 		game_render(&context, &state);
 		

@@ -21,6 +21,7 @@ class Component{
     
     string GetName() { return name; };
     void Print();
+    void Destroy();
 };
 
 #endif

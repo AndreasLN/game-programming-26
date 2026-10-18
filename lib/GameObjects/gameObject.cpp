@@ -10,6 +10,9 @@ GameObject::GameObject(GameObject * parent, string name, Transform2D transform)
 {
     this->parent = parent;
     this->name = name;
+    if (parent != nullptr){
+        parent->AddChild(this);
+    }
 }
 
 GameObject::GameObject() 
@@ -46,9 +49,16 @@ void GameObject::Destroy(){
     }
     children.clear();
 
+    for (size_t i = 0; i < this->components.size(); ++i)
+    {
+        components[i]->Destroy();
+    }
+
     components.clear();
-    
-    parent->children.erase(find(parent->children.begin(), parent->children.end(), this));
+    if(parent != nullptr){
+        parent->children.erase(find(parent->children.begin(), parent->children.end(), this));
+
+    }
     
     std::cout << this->name << " is being deleted.." << std::endl;
 

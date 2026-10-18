@@ -21,7 +21,8 @@ class Player : public Character {
         void Move(float delta);
 		void BorderCollision();
         void Print();
-		
+		void Destroy();
+
 };
 
 #endif

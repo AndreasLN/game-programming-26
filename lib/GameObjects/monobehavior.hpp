@@ -15,6 +15,8 @@ class MonoBehavior : public Component{
         virtual void Start();
         virtual void Update(float delta);
         void Print();
+        void Destroy();
+
 };
 
 #endif

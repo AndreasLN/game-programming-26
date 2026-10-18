@@ -54,7 +54,8 @@ void Player::Update(float delta)
 		context->camera_active->world_position = gameObject.transform.position;
 }
 
-
-
+void Player::Destroy(){
+    delete this;
+}
 
 

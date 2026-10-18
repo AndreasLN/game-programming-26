@@ -53,5 +53,7 @@ void Sprite2D::Awake() {
     MonoBehavior::Awake();
 }
 
-
+void Sprite2D::Destroy(){
+    delete this;
+}
 

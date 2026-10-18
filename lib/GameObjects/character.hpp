@@ -29,6 +29,7 @@ class Character : public MonoBehavior {
         
         void Start();
         void Print();
+        void Destroy();
 		
 };
 

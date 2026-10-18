@@ -24,6 +24,7 @@ class Sprite2D : public MonoBehavior, public Rendered
     void RectRender(SDL_Renderer * renderer);
     void Print();
     void Render(EngineContext * context);
+    void Destroy();
 };
 
 

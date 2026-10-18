@@ -49,5 +49,7 @@ void Tilemap::Awake() {
     MonoBehavior::Awake();
 }
 
-
+void Tilemap::Destroy(){
+    delete this;
+}
 

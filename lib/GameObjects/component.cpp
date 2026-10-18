@@ -13,4 +13,8 @@ void Component::Print(){
     std::cout << "This is game component";
 }
 
+void Component::Destroy(){
+    delete this;
+}
+
 

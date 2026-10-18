@@ -23,6 +23,8 @@ void MonoBehavior::Print(){
     std::cout << "This is a Monobehavior class" << endl;
 }
 
-
+void MonoBehavior::Destroy(){
+    delete this;
+}
 
 
