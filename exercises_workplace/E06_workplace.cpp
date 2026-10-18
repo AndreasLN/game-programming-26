@@ -28,24 +28,6 @@ const int ENTITY_COUNT = 4096;
 const int PLAYER_SPEED = 2;
 
 
-
-struct E06_Entity
-{
-	Sprite sprite;
-	Transform2D transform;
-
-	E06_Entity() {
-	}
-
-	E06_Entity(Sprite sprite, Transform2D  transform) 
-	: sprite(sprite), transform(transform) {}
-
-};
-
-
-
-
-
 bool operator<(const vec2f& lhs, const vec2f& rhs)
 {
     if (lhs.x != rhs.x) {
@@ -62,13 +44,6 @@ bool operator==(const vec2f& lhs, const vec2f& rhs)
 	else{
 		return false;
 	}
-};
-
-struct E06_TileMap
-{
-	map<vec2f, E06_Entity*> entities; // easier lookup for entities in tilemap;
-	map<vec2f, SDL_FRect> map; // Each sprite has unique transform
-	Transform2D transform;
 };
 
 SDL_FRect dirt_1 = SDL_FRect{1, 4, 16, 16};
@@ -90,16 +65,12 @@ map<vec2f, SDL_FRect> map_example = {
 struct E06_GameState
 {
 	// shortcut references
-	E06_TileMap* tilemap;
 
 	// game-allocated memory
-	list<E06_Entity*> entities;
 
 	vector<MonoBehavior*> starts;
 	vector<MonoBehavior*> updates;
 	vector<Rendered*> renders;
-
-	int entities_alive_count;
 
 	// SDL-allocated structures
 	SDL_Texture* atlas;
@@ -118,31 +89,6 @@ static void add_to_render(E06_GameState* state, Rendered * script)
 }
 
 
-static void entity_create(E06_GameState* state, E06_Entity * entity)
-{
-	if(!(state->entities_alive_count < ENTITY_COUNT))
-		// NOTE: this might as well be an assert, if we don't have a way to recover/handle it
-		return;
-
-	// // concise version
-	//return &state->entities[state->entities_alive_count++];
-
-	state->entities.push_back(entity);
-	
-	++state->entities_alive_count;
-	return;
-}
-
-// NOTE: this only works if nobody holds references to other entities!
-//       if that were the case, we couldn't swap them around.
-//       We will see in later lectures how to handle this kind of problems
-static void entity_destroy(E06_GameState* state, E06_Entity* entity)
-{
-	// NOTE: here we want to fail hard, nobody should pass us a pointer not gotten from `entity_create()`
-	
-	--state->entities_alive_count;
-	state->entities.remove(entity);
-}
 
 static void Start(E06_GameState* state){
 	for (size_t i = 0; i < state->starts.size(); ++i)
@@ -171,8 +117,6 @@ static void Render(EngineContext* context, E06_GameState* state){
 
 static void game_init(EngineContext* context, E06_GameState* state)
 {
-	// allocate memory
-	state->entities = { };
 
 	// TODO allocate space for tile info (when we'll load those from file)
 	// texture atlases
@@ -188,8 +132,8 @@ static void mouse_tint(EngineContext* context, E06_GameState* state){
 		vec2f point = itu_lib_context_point_screen_to_global(context, context->mouse_pos);
 		try
 		{
-			auto entity = state->tilemap->entities.at(vec2f{floorf(point.x), floorf(point.y)});
-			entity->sprite.tint.r = 100;
+			//auto entity = state->tilemap->entities.at(vec2f{floorf(point.x), floorf(point.y)});
+			//entity->sprite.tint.r = 100;
 		}
 		catch(const std::exception& e)
 		{
@@ -198,76 +142,54 @@ static void mouse_tint(EngineContext* context, E06_GameState* state){
 
 static void game_reset(EngineContext* context, E06_GameState* state)
 {
-	state->entities_alive_count = 0;
-	// entities
-	{
-		E06_Entity * bg = new E06_Entity();
+	
+	
+	GameObject * root = new GameObject(nullptr, "root", {0,0});
 
-		entity_create(state, bg);
-		SDL_FRect sprite_rect = SDL_FRect{ 0, 0, 1024, 1024};
-		itu_lib_sprite_init(
-			&bg->sprite,
-			state->bg,
-			itu_lib_sprite_get_source_rect(0, 0, 1024, 1024)
-		);
+	// Background
+	{
+		GameObject * bg = new GameObject(root, "bg", {0,0});
 		bg->transform.scale = VEC2F_ONE;
 		bg->transform.rotation = 0;
 		bg->transform.position = VEC2F_ZERO;
+		
+		Sprite2D * bg_sprite2d = new Sprite2D(*bg, state->bg, {0, 0, 1024, 1024});
+		create_monobehavior_script(state, bg_sprite2d);
+		add_to_render(state, bg_sprite2d);
 	}
 
-	// TILEMAP
+	// Tilemap
 	{
-		state->tilemap = new E06_TileMap();
-		state->tilemap->transform.position = VEC2F_ZERO;
-		state->tilemap->transform.scale = VEC2F_ONE;
-		state->tilemap->map = map_example;
-		state->tilemap->entities = {};
+		GameObject * tilemap = new GameObject(root, "tilemap", {0,0});
+		tilemap->transform.scale = VEC2F_ONE;
+		tilemap->transform.rotation = 0;
+		tilemap->transform.position = VEC2F_ZERO;
 
-		for(auto pair : state->tilemap->map){
-			E06_Entity* entity = new E06_Entity();
-			entity_create(state, entity);
-			entity->transform.scale = state->tilemap->transform.scale;
-			entity->transform.position = state->tilemap->transform.position + pair.first;
-			entity->transform.rotation = 0;
-
-			itu_lib_sprite_init(
-				&entity->sprite,
-				state->atlas,
-				itu_lib_sprite_get_source_rect(pair.second.x, pair.second.y, pair.second.w, pair.second.h)
-			);
-			entity->sprite.pivot.y = 0.0f;
-			entity->sprite.pivot.x = 0.0f;
-			state->tilemap->entities[pair.first] = entity;
-		}
+		Tilemap * tilemap_sprite = new Tilemap(*tilemap, state->atlas, map_example);
+		create_monobehavior_script(state, tilemap_sprite);
+		add_to_render(state, tilemap_sprite);
 	}
 
-	GameObject * root = new GameObject(nullptr, "root", {0,0});
+	//player
+	{
+		GameObject * child = new GameObject(root, "child", {0,0});
 
-	GameObject * child = new GameObject(root, "child", {0,0});
+		
+		Sprite2D * sprite2d = new Sprite2D(*child, state->atlas, {1, 10, 16, 16});
+		create_monobehavior_script(state, sprite2d);
+		add_to_render(state, sprite2d);
+		
+		child->transform.position = VEC2F_ZERO;
+		child->transform.scale = VEC2F_ONE;
+		child->transform.rotation = 0;	
 
-	SDL_FRect sprite2d_rect = SDL_FRect{ 0, 0, 1024, 1024};
+		Player * playerComponent = new Player(*child, PLAYER_SPEED, context);
+		create_monobehavior_script(state, playerComponent);
 
-	SDL_Log("%i", child->GetComponents().size()) ;
+		sprite2d->Print();
+
+	}
 	
-	Sprite2D * sprite2d = new Sprite2D(*child, state->atlas, {1, 10, 16, 16});
-	create_monobehavior_script(state, sprite2d);
-	add_to_render(state, sprite2d);
-
-	SDL_Log("%i", child->GetComponents().size()) ;
-	
-	Sprite2D * childComponent = child->GetComponentofType<Sprite2D>(sprite2d->GetName());
-
-	child->transform.position = VEC2F_ZERO;
-	child->transform.scale = VEC2F_ONE;
-	child->transform.rotation = 0;	
-
-	Player * playerComponent = new Player(*child, PLAYER_SPEED, context);
-	create_monobehavior_script(state, playerComponent);
-
-	sprite2d->Print();
-
-	childComponent->Print();
-
 
 	// NPC
 	{
@@ -302,21 +224,6 @@ static void game_update(EngineContext* context, E06_GameState* state)
 
 static void game_render(EngineContext* context, E06_GameState* state)
 {
-	for(E06_Entity * entity : state->entities)
-	{
-		// render texture
-		SDL_FRect rect_src = entity->sprite.rect;
-		SDL_FRect rect_dst;
-
-		if(DEBUG_render_textures)
-			itu_lib_sprite_render(context, &entity->sprite, &entity->transform);
-
-		if(DEBUG_render_outlines)
-			itu_lib_sprite_render_debug(context, &entity->sprite, &entity->transform);
-		
-		entity->sprite.tint.r = 1;
-	}
-
 	Render(context, state);
 
 	// debug window
@@ -335,7 +242,7 @@ int main(void)
 	bool quit = false;
 	SDL_Window* window;
 	EngineContext context = { 0 };
-	E06_GameState  state   = { 0 };
+	E06_GameState  state   = {  };
 
 	itu_lib_context_init(&config, &context);
 	itu_lib_context_set_active_camera(&context, &context.camera_default);
@@ -366,15 +273,11 @@ int main(void)
 				{
 	
 					vec2f world_point = itu_lib_context_point_screen_to_window(&context, context.mouse_pos);
-					//SDL_Log("WORLD: MOUSE POS: X, %f, POS: Y, %f", world_point.x, world_point.y);
-					//SDL_Log("CAMERA: MOUSE POS: X, %f, POS: Y, %f", context.mouse_pos.x, context.mouse_pos.y);
+					
 					context.mouse_pos.x = event.motion.x;
 					context.mouse_pos.y = event.motion.y;
 					vec2f point = itu_lib_context_point_screen_to_global(&context, context.mouse_pos);
-					//SDL_Log("SCREEN: MOUSE POS: X, %f, POS: Y, %f", point.x, point.y);
-					//SDL_Log("SCREEN FLOORED: MOUSE POS: X, %f, POS: Y, %f", floorf(point.x), floor(point.y));
-					
-					
+										
 					context.mouse_delta.x = event.motion.xrel;
 					context.mouse_delta.y = event.motion.yrel;
 					break;

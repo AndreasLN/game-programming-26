@@ -9,6 +9,7 @@
 #include <rendered.hpp>
 #include <character.hpp>
 #include <npc.hpp>
+#include <tilemap.hpp>
 
 #ifndef IN_IDE
 	#include <gameObject.cpp>
@@ -19,6 +20,7 @@
     #include <character.cpp>
 	#include <player.cpp>
 	#include <npc.cpp>
+	#include <tilemap.cpp>
 	
 #endif // IN_IDE
 

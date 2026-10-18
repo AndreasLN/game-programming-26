@@ -7,8 +7,6 @@ Sprite2D::Sprite2D(GameObject &gameObject, SDL_Texture * texture, SDL_FRect srcR
     this->rect = srcRect;
     this->sprite = new Sprite();
 
-
-
     itu_lib_sprite_init(
         this->sprite,
         texture,

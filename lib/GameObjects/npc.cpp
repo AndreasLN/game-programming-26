@@ -23,9 +23,7 @@ void NPC::Start()
 
 void NPC::Update(float delta)
 {
-    SDL_Log("HIIIIII");
     vec2f mov = { 0 };
-		//SDL_Log("%d", npc->state);
 		switch (state)
 		{
 			case IDLE:
