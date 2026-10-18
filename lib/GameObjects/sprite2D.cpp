@@ -1,10 +1,17 @@
 #include <iostream>
 #include <gameObjectsLib.hpp>
 
-Sprite2D::Sprite2D(GameObject &gameObject, SDL_FRect rect) : MonoBehavior(gameObject)
+Sprite2D::Sprite2D(GameObject &gameObject, SDL_Texture * texture, SDL_FRect srcRect) : MonoBehavior(gameObject)
 {
     this->name = "Sprite2D";
-    this->rect = rect;
+    this->rect = srcRect;
+    this->sprite = new Sprite();
+
+    itu_lib_sprite_init(
+        this->sprite,
+        texture,
+        itu_lib_sprite_get_source_rect(srcRect.x, srcRect.y, srcRect.w, srcRect.h)
+	);
 }
 
 Sprite2D::Sprite2D(GameObject &gameObject, SDL_FRect rect, Uint8 r, Uint8 g, Uint8 b,  Uint8 a) : MonoBehavior(gameObject)
@@ -15,7 +22,6 @@ Sprite2D::Sprite2D(GameObject &gameObject, SDL_FRect rect, Uint8 r, Uint8 g, Uin
     this->g = g;
     this->b = b;
     this->a = a;
-
 }
 
 void Sprite2D::RectRender(SDL_Renderer * renderer)
@@ -29,10 +35,18 @@ void Sprite2D::Print()
     std::cout << "This is a Sprite2D class";
 }
 
-void Sprite2D::Update(float delta)
-{
-    rect.x = gameObject.GetPos().x;
-    rect.y = gameObject.GetPos().y;
+void Sprite2D::Update(float delta) {
+    rect.x = gameObject.GetTransform2D().position.x;
+    rect.y = gameObject.GetTransform2D().position.y;
 }
+
+void Sprite2D::Start() {
+
+}
+
+void Sprite2D::Awake() {
+    MonoBehavior::Awake();
+}
+
 
 

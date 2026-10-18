@@ -7,6 +7,15 @@
 #include "itu_lib_render2d.hpp"
 #include "sprite2D.hpp"
 
+
+enum PlayerDirection{
+	LEFT,
+	RIGHT,
+	UP,
+	DOWN,
+	LAST
+};
+
 class Player : public MonoBehavior {
 	
 	public:
@@ -16,8 +25,10 @@ class Player : public MonoBehavior {
 		int vertical;
 		double speed;
 		float player_size;
-        Player(GameObject &gameObject); // Constructor with parameters}
-		Player(GameObject &gameObject, float player_size, double speed); // Constructor with parameters}
+		PlayerDirection direction;
+		EngineContext * context;
+        Player(GameObject &gameObject, EngineContext * context); // Constructor with parameters}
+		Player(GameObject &gameObject, float player_size, double speed, EngineContext * context); // Constructor with parameters}
 		
         void Update(float delta);
         void Start();

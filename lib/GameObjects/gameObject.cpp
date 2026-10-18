@@ -6,18 +6,16 @@
 #include <algorithm>
 
 
-GameObject::GameObject(GameObject * parent, string name, vec2f pos) 
+GameObject::GameObject(GameObject * parent, string name, Transform2D transform) 
 {
     this->parent = parent;
     this->name = name;
-    this->pos = pos;
 }
 
 GameObject::GameObject() 
 {
     this->parent = parent;
     this->name = name;
-    this->pos = pos;
 }
 
 void GameObject::AddChild(GameObject * gameObject) 
@@ -56,6 +54,8 @@ void GameObject::Destroy(){
 
     delete this;
 }
+
+
 
 template<typename T> T* GameObject::GetComponentofType(string name)
 {

@@ -11,9 +11,9 @@ class MonoBehavior : public Component{
     
     public:
         MonoBehavior(GameObject &gameObject);
-        void Awake();
-        void Start();
-        void Update(float delta);
+        virtual void Awake();
+        virtual void Start();
+        virtual void Update(float delta);
         void Print();
 };
 

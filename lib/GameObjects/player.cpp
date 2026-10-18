@@ -2,12 +2,14 @@
 #include <gameObjectsLib.hpp>
 
 
-Player::Player(GameObject &gameObject, float player_size, double speed) : MonoBehavior(gameObject)
+Player::Player(GameObject &gameObject, float player_size, double speed, EngineContext * context) : MonoBehavior(gameObject)
 {
     this->name = "Player";
     this->horizontal = 0;
     this->vertical = 0;
     this->speed = speed;
+    this->direction = RIGHT;
+    this->context = context;
 }
 
 
@@ -21,8 +23,42 @@ void Player::Start()
     this->sprite = this->gameObject.GetComponentofType<Sprite2D>("Sprite2D");
 }
 
+
+
 void Player::Update(float delta)
 {
+
+    const float player_speed = 2;
+
+		vec2f mov = { 0 };
+		if(context->btn_isdown_up){
+			mov.y += 1;
+			direction = UP;
+		}		
+		if(context->btn_isdown_down){
+			mov.y -= 1;
+			direction = DOWN;
+		}	
+		if(context->btn_isdown_left){
+			mov.x -= 1;
+			direction = LEFT;	
+		}	
+		if(context->btn_isdown_right){
+			mov.x += 1;
+			direction = RIGHT;
+		}
+				
+		if(direction == LEFT && !sprite->sprite->flip_horizontal){
+			sprite->sprite->flip_horizontal = true;
+		}
+		else if (direction == RIGHT && sprite->sprite->flip_horizontal){
+			sprite->sprite->flip_horizontal = false;
+		}
+
+		gameObject.transform.position = gameObject.transform.position + mov * (speed * context->delta);
+
+		// camera follows player
+		context->camera_active->world_position = gameObject.transform.position;
 }
 
 

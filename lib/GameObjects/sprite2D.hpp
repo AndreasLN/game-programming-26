@@ -7,17 +7,18 @@
 
 class Sprite2D : public MonoBehavior{
     private:
-    Sprite * sprite;
     Uint8 r = 0x00, g = 0x00, b = 0x00, a = 0XFF;
     SDL_FRect rect;
     
     public:
-    Sprite2D(GameObject &gameObject, SDL_FRect rect);
+    Sprite * sprite;
+    
+    Sprite2D(GameObject &gameObject, SDL_Texture * texture, SDL_FRect srcRect);
     Sprite2D(GameObject &gameObject, SDL_FRect rect, Uint8 r, Uint8 g, Uint8 b,  Uint8 a);
 
-    void Awake();
-    void Start();
-    void Update(float delta);
+    void Awake() override;
+    void Start() override;
+    void Update(float delta) override;
     void RectRender(SDL_Renderer * renderer);
     void Print();
 };

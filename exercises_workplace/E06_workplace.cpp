@@ -5,6 +5,14 @@
 #include <gameObjectsLib.hpp>
 
 
+enum Direction{
+	D_LEFT,
+	D_RIGHT,
+	D_UP,
+	D_DOWN,
+	D_LAST
+};
+
 using namespace std;
 #include <list>
 
@@ -18,14 +26,6 @@ bool DEBUG_render_textures = true;
 bool DEBUG_render_outlines = true;
 const int ENTITY_COUNT = 4096;
 const int PLAYER_SPEED = 2;
-
-enum Direction{
-	LEFT,
-	RIGHT,
-	UP,
-	DOWN,
-	LAST
-};
 
 enum NPCSTATE{
 	MOVING,
@@ -51,7 +51,7 @@ struct E06_Character_Entity: public E06_Entity
 
 	E06_Character_Entity() {}
 
-	E06_Character_Entity(Sprite  sprite, Transform2D  transform, Direction direction = DOWN)
+	E06_Character_Entity(Sprite  sprite, Transform2D  transform, Direction direction = D_DOWN)
 	: E06_Entity(sprite, transform), direction(direction) {}
 
 };
@@ -127,7 +127,6 @@ map<vec2f, SDL_FRect> map_example = {
 struct E06_GameState
 {
 	// shortcut references
-	E06_Character_Entity* player;
 	E06_TileMap* tilemap;
 
 	// game-allocated memory
@@ -136,6 +135,7 @@ struct E06_GameState
 
 	vector<MonoBehavior*> starts;
 	vector<MonoBehavior*> updates;
+
 	int entities_alive_count;
 
 	// SDL-allocated structures
@@ -146,6 +146,7 @@ struct E06_GameState
 static void create_monobehavior_script(E06_GameState* state, MonoBehavior * script)
 {
 	state->starts.push_back(script);
+	script->Awake();
 }
 
 static void entity_create(E06_GameState* state, E06_Entity * entity)
@@ -175,10 +176,10 @@ static void entity_destroy(E06_GameState* state, E06_Entity* entity)
 }
 
 static void Start(E06_GameState* state){
-	
 	for (size_t i = 0; i < state->starts.size(); ++i)
 	{
-		state->updates[i]->Start();
+		state->starts[i]->Start();
+		state->updates.push_back(state->starts[i]);
 	}
 
 	state->starts.clear();
@@ -206,30 +207,7 @@ static void game_init(EngineContext* context, E06_GameState* state)
 	state->starts = { };
 
 
-	GameObject * root = new GameObject(nullptr, "root", {0,0});
-
-	GameObject * child = new GameObject(root, "child", {0,0});
-
-	SDL_FRect sprite2d_rect = SDL_FRect{ 0, 0, 1024, 1024};
-
-	SDL_Log("%i", child->GetComponents().size()) ;
 	
-	Sprite2D * sprite2d = new Sprite2D(*child, sprite2d_rect);
-	create_monobehavior_script(state, sprite2d);
-
-	SDL_Log("%i", child->GetComponents().size()) ;
-	
-	Sprite2D * childComponent = child->GetComponentofType<Sprite2D>(sprite2d->GetName());
-
-
-	Player * playerComponent = new Player(*child, guy.w, PLAYER_SPEED);
-	create_monobehavior_script(state, playerComponent);
-
-	sprite2d->Print();
-
-	childComponent->Print();
-
-	Start(state);
 
 }
 
@@ -314,60 +292,44 @@ static void game_reset(EngineContext* context, E06_GameState* state)
 			state->npcs.push_front(npc);
 		}
 	}
+	
+	GameObject * root = new GameObject(nullptr, "root", {0,0});
 
+	GameObject * child = new GameObject(root, "child", {0,0});
+
+	SDL_FRect sprite2d_rect = SDL_FRect{ 0, 0, 1024, 1024};
+
+	SDL_Log("%i", child->GetComponents().size()) ;
+	
+	Sprite2D * sprite2d = new Sprite2D(*child, state->atlas, {1, 10, 16, 16});
+	create_monobehavior_script(state, sprite2d);
+
+	SDL_Log("%i", child->GetComponents().size()) ;
+	
+	Sprite2D * childComponent = child->GetComponentofType<Sprite2D>(sprite2d->GetName());
+
+	child->transform.position = VEC2F_ZERO;
+	child->transform.scale = VEC2F_ONE;
+	child->transform.rotation = 0;	
+
+	Player * playerComponent = new Player(*child, guy.w, PLAYER_SPEED, context);
+	create_monobehavior_script(state, playerComponent);
+
+	sprite2d->Print();
+
+	childComponent->Print();
+
+	Start(state);
 
 	{
-		state->player = new E06_Character_Entity();
-		entity_create(state, state->player);
-		state->player->transform.position = VEC2F_ZERO;
-		state->player->transform.scale = VEC2F_ONE;
-		state->player->transform.rotation = 0;
-		itu_lib_sprite_init(
-			&state->player->sprite,
-			state->atlas,
-			itu_lib_sprite_get_source_rect(1, 10, 16, 16)
-		);
-
-		// raise sprite a bit, so that the position concides with the center of the image
-		state->player->sprite.pivot.y = 0.3f;
+		
 	}
 }
 
 static void game_update(EngineContext* context, E06_GameState* state)
 {
 	{
-		const float player_speed = 2;
-
-		E06_Entity* entity = state->player;
-		vec2f mov = { 0 };
-		if(context->btn_isdown_up){
-			mov.y += 1;
-			state->player->direction = UP;
-		}		
-		if(context->btn_isdown_down){
-			mov.y -= 1;
-			state->player->direction = DOWN;
-		}	
-		if(context->btn_isdown_left){
-			mov.x -= 1;
-			state->player->direction = LEFT;	
-		}	
-		if(context->btn_isdown_right){
-			mov.x += 1;
-			state->player->direction = RIGHT;
-		}
-				
-		if(state->player->direction == LEFT && !state->player->sprite.flip_horizontal){
-			state->player->sprite.flip_horizontal = true;
-		}
-		else if (state->player->direction == RIGHT && state->player->sprite.flip_horizontal){
-			state->player->sprite.flip_horizontal = false;
-		}
-
-		entity->transform.position = entity->transform.position + mov * (player_speed * context->delta);
-
-		// camera follows player
-		context->camera_active->world_position = entity->transform.position;
+		Update(context, state);
 	}
 
 	const float npc_speed = 1.5;
@@ -393,25 +355,25 @@ static void game_update(EngineContext* context, E06_GameState* state)
 				if (npc->moving_timer->time > 0){
 					switch (npc->direction)
 					{
-					case UP:
+					case D_UP:
 						mov.y += 1;
 						break;
-					case DOWN:
+					case D_DOWN:
 						mov.y -= 1;
 						break;
-					case LEFT:
+					case D_LEFT:
 						mov.x -= 1;
 						break;
-					case RIGHT:
+					case D_RIGHT:
 						mov.x += 1;
 						break;
 					default:
 						break;
 					}
-					if(npc->direction == LEFT && !npc->sprite.flip_horizontal){
+					if(npc->direction == D_LEFT && !npc->sprite.flip_horizontal){
 						npc->sprite.flip_horizontal = true;
 					}
-					else if (npc->direction == RIGHT && npc->sprite.flip_horizontal){
+					else if (npc->direction == D_RIGHT && npc->sprite.flip_horizontal){
 						npc->sprite.flip_horizontal = false;
 					}
 
